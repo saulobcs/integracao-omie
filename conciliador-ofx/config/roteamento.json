@@ -1,0 +1,44 @@
+{
+  "descricao": "Mapa de roteamento MEMO -> conta/acao no Omie. Preencher os campos null (pendencia P1: obter nCodCC via ListarContasCorrentes).",
+  "conta_corrente_origem": {
+    "acctid_ofx": "6684788-0",
+    "bankid_ofx": "0197",
+    "ncodcc_omie": null
+  },
+  "regras_credito": [
+    {
+      "nome": "Antecipacao de vendas",
+      "match": { "tipo": "igual", "valor": "Recebimento vendas - Antecipação" },
+      "acao": "incluir_lanc_cc",
+      "ncodcc_destino": null,
+      "ccodcateg": null
+    },
+    {
+      "nome": "iFood",
+      "match": { "tipo": "contem", "valor": "IFOODCOM" },
+      "acao": "incluir_lanc_cc",
+      "ncodcc_destino": null,
+      "ccodcateg": null
+    },
+    {
+      "nome": "Pix Maquininha",
+      "match": { "tipo": "sufixo", "valor": " - Pix | Maquininha" },
+      "acao": "incluir_lanc_cc",
+      "ncodcc_destino": null,
+      "ccodcateg": null
+    }
+  ],
+  "regras_debito": [
+    {
+      "nome": "Pagamento a fornecedor",
+      "match": { "tipo": "sufixo", "valor": " - Pagamento" },
+      "acao": "baixar_conta_pagar"
+    },
+    {
+      "nome": "Pagamento freelancer/motoboy (Pix)",
+      "match": { "tipo": "sufixo", "valor": " - Transferência | Pix" },
+      "acao": "pendente_p4",
+      "observacao": "Pendencia P4: definir tratativa (conta de mao de obra / busca em CP / lista de nomes). Por ora, classificado como pendente para nao ir ao manual silenciosamente."
+    }
+  ]
+}
