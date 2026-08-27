@@ -39,10 +39,28 @@ regenera a cada exportação?
 
 **Status:** aberto — confirmar na página logada do serviço.
 
-- `LancarRecebimento` / baixa de contas a pagar aceitam um **código de integração
-  da baixa** (para enviar o `FITID` e obter idempotência server-side)?
-- Identificação exata do título na baixa: `codigo_lancamento` do título vs.
+- `LancarPagamento` (baixa de contas a pagar) e `LancarRecebimento` aceitam um
+  **código de integração da baixa** (para correlacionar com o `FITID`)?
+- Identificação exata do título na baixa: `codigo_lancamento` (nCodTitulo) vs.
   código de integração.
+- `IncluirLancCC`: comportamento ao reenviar um `cCodIntLanc` já usado (erro de
+  duplicidade vs. upsert)? Define a força da idempotência server-side.
+
+### P3.1 — Derivação FITID → `cCodIntLanc` (limite de 20 caracteres)
+
+**Status:** aberto — decisão técnica.
+
+O `cCodIntLanc` do `IncluirLancCC` é **string(20)** e **obrigatório**, mas o FITID
+da Stone é um **UUID de 36 caracteres** — não cabe direto (ver
+[`05-analise-endpoints.md`](./05-analise-endpoints.md), seção 2).
+
+**Proposta:** derivar `cCodIntLanc` de um **hash determinístico** do FITID (ex.:
+20 primeiros hex de `sha256(fitid)`), garantindo que o mesmo FITID gere sempre o
+mesmo código (idempotência) e caiba em 20 chars. Persistir o vínculo
+`FITID ⇄ cCodIntLanc ⇄ nCodLanc/codigo_baixa` na tabela de rastreio.
+
+**A validar:** risco de colisão (desprezível no volume atual) e se 20 hex são
+suficientes; se necessário, usar base62 para caber mais entropia em 20 chars.
 
 ---
 
