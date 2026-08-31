@@ -1,0 +1,160 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Omie - Conciliacao OFX (Setup extra)",
+    "version": "1.0.0",
+    "description": "Endpoints de setup complementares para a conciliacao OFX -> Omie: descoberta dos valores validos de cCodCateg (categorias) e cTipo (tipos de documento) usados no IncluirLancCC.\n\nAutenticacao: a Omie NAO possui endpoint de auth separado. As credenciais app_key/app_secret vao no corpo de cada chamada. Use as variaveis de ambiente do Apidog: {{OMIE_APP_KEY}} e {{OMIE_APP_SECRET}}.\n\nSempre inspecione o corpo da resposta: a Omie pode retornar erro de negocio com faultstring/faultcode mesmo em HTTP != 200.\n\nObservacao: os nomes exatos dos parametros de filtro so sao 100% confirmaveis na pagina logada do Portal do Desenvolvedor. As chamadas minimas abaixo (paginacao simples / param vazio) devem retornar as listas."
+  },
+  "servers": [
+    {
+      "url": "{{OMIE_BASE}}",
+      "description": "Base da API Omie",
+      "variables": {
+        "OMIE_BASE": {
+          "default": "https://app.omie.com.br/api/v1"
+        }
+      }
+    }
+  ],
+  "tags": [
+    { "name": "Setup", "description": "Descoberta de valores validos para o IncluirLancCC (cCodCateg / cTipo)" }
+  ],
+  "paths": {
+    "/geral/categorias/": {
+      "post": {
+        "tags": ["Setup"],
+        "summary": "ListarCategorias - valores validos de cCodCateg",
+        "operationId": "listarCategorias",
+        "description": "Lista as categorias cadastradas para descobrir o codigo (string 20) usado em detalhes.cCodCateg do IncluirLancCC.\n\nUse o campo 'codigo' de cada categoria para preencher os ccodcateg do config/roteamento.json.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call": { "type": "string", "example": "ListarCategorias" },
+                  "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
+                  "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
+                  "param": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "pagina": { "type": "integer", "description": "Pagina (inicia em 1)", "example": 1 },
+                        "registros_por_pagina": { "type": "integer", "description": "<= 100 recomendado", "example": 100 }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "call": "ListarCategorias",
+                "app_key": "{{OMIE_APP_KEY}}",
+                "app_secret": "{{OMIE_APP_SECRET}}",
+                "param": [
+                  {
+                    "pagina": 1,
+                    "registros_por_pagina": 100
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lista de categorias",
+            "content": {
+              "application/json": {
+                "example": {
+                  "pagina": 1,
+                  "total_de_paginas": 1,
+                  "categoria_cadastro": [
+                    {
+                      "codigo": "1.01.01",
+                      "descricao": "Receita de Vendas",
+                      "natureza": "R",
+                      "tipo_categoria": "",
+                      "codigo_dre": "",
+                      "conta_inativa": "N"
+                    },
+                    {
+                      "codigo": "2.02.05",
+                      "descricao": "Tarifas Bancarias",
+                      "natureza": "D",
+                      "tipo_categoria": "",
+                      "codigo_dre": "",
+                      "conta_inativa": "N"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/geral/tiposdoc/": {
+      "post": {
+        "tags": ["Setup"],
+        "summary": "PesquisarTipoDocumento - valores validos de cTipo",
+        "operationId": "pesquisarTipoDocumento",
+        "description": "Lista os tipos de documento para descobrir o codigo (string 5) usado em detalhes.cTipo do IncluirLancCC (ex.: PIX, DIN, BOL, TED).\n\nSem filtros, retorna a lista completa. Prefira sempre um codigo retornado por este endpoint em vez de 'chutar' o valor.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call": { "type": "string", "example": "PesquisarTipoDocumento" },
+                  "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
+                  "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
+                  "param": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "filtrar_por_codigo": { "type": "string", "maxLength": 5, "description": "Opcional: codigo exato do tipo de documento", "example": "" },
+                        "filtrar_por_descricao": { "type": "string", "description": "Opcional: descricao do tipo de documento", "example": "" }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "call": "PesquisarTipoDocumento",
+                "app_key": "{{OMIE_APP_KEY}}",
+                "app_secret": "{{OMIE_APP_SECRET}}",
+                "param": [
+                  {}
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lista de tipos de documento",
+            "content": {
+              "application/json": {
+                "example": {
+                  "tipo_documento_cadastro": [
+                    { "codigo": "PIX", "descricao": "PIX" },
+                    { "codigo": "DIN", "descricao": "Dinheiro" },
+                    { "codigo": "BOL", "descricao": "Boleto Bancario" },
+                    { "codigo": "TED", "descricao": "Transferencia (TED/DOC)" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {}
+  }
+}

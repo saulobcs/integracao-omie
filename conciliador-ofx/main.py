@@ -36,12 +36,34 @@ _AQUI = os.path.dirname(os.path.abspath(__file__))
 _OFX_PADRAO = os.path.join(_AQUI, "..", "arquivos-referencia", "Comprovante de Extrato.ofx")
 _CONFIG_PADRAO = os.path.join(_AQUI, "config", "roteamento.json")
 _SAIDA_PADRAO = os.path.join(_AQUI, "saida")
+_PLANO_CONTAS_PADRAO = os.path.join(_AQUI, "..", "arquivos-referencia", "contas-haru.json")
 
 
-def processar(ofx_path: str, config_path: str) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def carregar_plano_contas(caminho: str) -> Dict[int, str]:
+    """Le o contas-haru.json e devolve o mapa nCodCC -> descricao.
+
+    Usado para exibir as contas de origem/destino como '(nCodCC) descricao'.
+    Se o arquivo nao existir, devolve mapa vazio (o formato exibira o nome
+    da origem ou '?').
+    """
+    if not os.path.exists(caminho):
+        return {}
+    with open(caminho, encoding="utf-8") as fh:
+        dados = json.load(fh)
+    contas = dados.get("ListarContasCorrentes", [])
+    return {int(c["nCodCC"]): c.get("descricao", "") for c in contas if "nCodCC" in c}
+
+
+def processar(
+    ofx_path: str,
+    config_path: str,
+    plano_contas_path: str = _PLANO_CONTAS_PADRAO,
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     extrato = parse_ofx(ofx_path)
     motor = MotorDeRegras.de_arquivo(config_path)
-    executor = ExecutorDryRun(motor.config)
+    origem = motor.selecionar_origem(extrato)
+    plano_contas = carregar_plano_contas(plano_contas_path)
+    executor = ExecutorDryRun(motor.config, origem, plano_contas)
 
     registros: List[Dict[str, Any]] = []
     for t in extrato.transacoes:
@@ -56,6 +78,8 @@ def processar(ofx_path: str, config_path: str) -> tuple[List[Dict[str, Any]], Di
                 "memo": t.memo,
                 "rota": resultado["rota"],
                 "regra": resultado["regra"],
+                "conta_origem": resultado["conta_origem"],
+                "conta_destino": resultado["conta_destino"],
                 "acao_omie": resultado["acao_omie"],
                 "call": resultado["call"],
                 "endpoint": resultado["endpoint"],
@@ -69,6 +93,9 @@ def processar(ofx_path: str, config_path: str) -> tuple[List[Dict[str, Any]], Di
         "conta": extrato.acctid,
         "periodo": f"{extrato.dt_start} a {extrato.dt_end}",
         "saldo_final_ofx": float(extrato.saldo_final) if extrato.saldo_final is not None else None,
+        "origem_identificada": origem.get("nome") if origem else None,
+        "ncodcc_origem": origem.get("ncodcc_omie") if origem else None,
+        "conta_origem": executor.conta_origem,
     }
     return registros, resumo
 

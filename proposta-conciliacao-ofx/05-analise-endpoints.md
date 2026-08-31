@@ -42,6 +42,8 @@ Content-Type: application/json
 | Rota do conciliador | Endpoint | `call` | Papel |
 |---------------------|----------|--------|-------|
 | (setup) mapear conta | `/geral/contacorrente/` | `ListarContasCorrentes` | Descobrir `nCodCC` (pendência P1) |
+| (setup) categorias | `/geral/categorias/` | `ListarCategorias` | Descobrir valores válidos de `cCodCateg` |
+| (setup) tipos de documento | `/geral/tiposdoc/` | `PesquisarTipoDocumento` | Descobrir valores válidos de `cTipo` (PIX/DIN/BOL/TED...) |
 | credito_roteado | `/financas/contacorrentelancamentos/` | `IncluirLancCC` | Lançar crédito na conta destino |
 | baixa_conta_pagar (buscar) | `/financas/pesquisartitulos/` | `PesquisarTitulos` | Localizar o título a pagar |
 | baixa_conta_pagar (baixar) | `/financas/contapagar/` | `LancarPagamento` | Dar baixa no título |
@@ -77,6 +79,64 @@ Content-Type: application/json
 - **Atenção:** o OFX traz `ACCTID`/`BANKID`, mas o casamento com a conta do Omie
   provavelmente será **manual** (conferindo `numero_conta_corrente`/`descricao`),
   pois o número pode estar formatado diferente. Preenche o mapa de config uma vez.
+
+---
+
+## 1a. `ListarCategorias` — valores válidos de `cCodCateg`
+
+**Endpoint:** `/api/v1/geral/categorias/` · **Uso:** setup (descobrir os códigos de
+categoria que vão em `detalhes.cCodCateg` do `IncluirLancCC`).
+
+### Requisição (param)
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `pagina` | integer | Página (inicia em 1) |
+| `registros_por_pagina` | integer | ≤ 100 (recomendado) |
+| `filtrar_apenas_ativas` | string(1) | S/N (opcional) |
+
+### Resposta (campos-chave por categoria)
+| Campo | Descrição |
+|-------|-----------|
+| `codigo` | **Código da categoria (string 20)** — é o valor que vai em `cCodCateg` |
+| `descricao` | Descrição da categoria |
+| `natureza` | Natureza (receita/despesa...) |
+| `tipo_categoria` | Tipo da categoria |
+| `codigo_dre` | Conta do DRE associada |
+| `conta_inativa` | S/N |
+
+### Pode / Não pode
+- **Pode:** listar as categorias disponíveis e escolher o `codigo` correto para
+  cada regra de roteamento (preenche os `ccodcateg: null` de
+  [`03-regras-de-roteamento.md`](./03-regras-de-roteamento.md)).
+- **Atenção:** o campo é opcional no `IncluirLancCC`, mas para categorizar o
+  lançamento corretamente o `codigo` precisa existir e estar ativo.
+
+---
+
+## 1b. `PesquisarTipoDocumento` — valores válidos de `cTipo`
+
+**Endpoint:** `/api/v1/geral/tiposdoc/` · **Uso:** setup (descobrir os códigos de
+tipo de documento que vão em `detalhes.cTipo` do `IncluirLancCC`).
+
+### Requisição (param)
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `filtrar_por_codigo` | string(5) | Opcional — busca direta por código |
+| `filtrar_por_descricao` | string | Opcional — busca por descrição |
+
+*(Sem filtro, retorna a lista completa de tipos de documento.)*
+
+### Resposta (campos-chave por tipo)
+| Campo | Descrição |
+|-------|-----------|
+| `codigo` | **Código do tipo de documento (string 5)** — é o valor que vai em `cTipo` (ex.: PIX, DIN, BOL, TED) |
+| `descricao` | Descrição do tipo |
+
+### Pode / Não pode
+- **Pode:** obter a lista canônica de tipos aceitos e mapear cada regra de crédito
+  ao `cTipo` adequado (ex.: crédito Pix → `PIX`).
+- **Atenção:** usar sempre o `codigo` retornado por este endpoint; valores
+  "chutados" podem ser rejeitados pela Omie.
 
 ---
 
@@ -239,7 +299,9 @@ Content-Type: application/json
 
 ## Pendências que esta análise reforça
 
-- **P1** — obter `nCodCC` via `ListarContasCorrentes`.
+- **P1** — obter `nCodCC` via `ListarContasCorrentes`; e resolver os valores de
+  `cCodCateg` (via `ListarCategorias`) e `cTipo` (via `PesquisarTipoDocumento`)
+  para preencher o mapa de roteamento.
 - **P3** — confirmar, na página logada, os campos de idempotência/identificação em
   `IncluirLancCC` (comportamento do `cCodIntLanc` duplicado) e em `LancarPagamento`.
 - **Nova sub-pendência (P3.1):** definir a **estratégia de derivação do FITID → 

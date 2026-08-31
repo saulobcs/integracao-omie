@@ -1,44 +1,98 @@
 {
-  "descricao": "Mapa de roteamento MEMO -> conta/acao no Omie. Preencher os campos null (pendencia P1: obter nCodCC via ListarContasCorrentes).",
-  "conta_corrente_origem": {
-    "acctid_ofx": "6684788-0",
-    "bankid_ofx": "0197",
-    "ncodcc_omie": null
-  },
-  "regras_credito": [
+  "descricao": "Mapa de roteamento por conta de origem. A origem e identificada pelo BANKID/ACCTID do extrato OFX; cada origem tem suas proprias regras de credito/debito e contas de destino. Campos ncodcc/ccodcateg nulos = pendencia (P1: confirmar nCodCC via ListarContasCorrentes / contas-haru.json).",
+  "versao_schema": 2,
+  "origens": [
     {
-      "nome": "Antecipacao de vendas",
-      "match": { "tipo": "igual", "valor": "Recebimento vendas - Antecipação" },
-      "acao": "incluir_lanc_cc",
-      "ncodcc_destino": null,
-      "ccodcateg": null
+      "nome": "Stone",
+      "match_origem": { "bankid": "0197", "acctid": "6684788-0" },
+      "ncodcc_omie": 9250313570,
+      "descricao_origem": "Stone",
+      "regras_credito": [
+        {
+          "nome": "Recebimento de vendas (Credito)",
+          "match": { "tipo": "igual", "valor": "Recebimento vendas - Antecipação" },
+          "acao": "incluir_lanc_cc",
+          "ncodcc_destino": 9064882272,
+          "descricao_destino": "Stone - Cartão de Crédito",
+          "ccodcateg": null
+        },
+        {
+          "nome": "Recebimento via PIX (Maquininha)",
+          "match": { "tipo": "sufixo", "valor": " - Pix | Maquininha" },
+          "acao": "incluir_lanc_cc",
+          "ncodcc_destino": 9064890501,
+          "descricao_destino": "Stone - PIX",
+          "ccodcateg": null
+        },
+        {
+          "nome": "Recebimento via PIX (Transferência)",
+          "match": { "tipo": "sufixo", "valor": " - Transferência | Pix" },
+          "acao": "incluir_lanc_cc",
+          "ncodcc_destino": 9064890501,
+          "descricao_destino": "Stone - PIX",
+          "ccodcateg": null
+        }
+      ],
+      "regras_debito": [
+        {
+          "nome": "Pagamento a fornecedor (Débito)",
+          "match": { "tipo": "sufixo", "valor": " - Pagamento" },
+          "acao": "pendente_debito",
+          "ncodcc_destino": 9064886018,
+          "descricao_destino": "Stone - Cartão de Débito",
+          "observacao": "Pendencia: validar tratativa do debito Stone (baixa de conta a pagar vs. lancamento em Stone - Cartão de Débito)."
+        },
+        {
+          "nome": "Pagamento via PIX (Transferência)",
+          "match": { "tipo": "sufixo", "valor": " - Transferência | Pix" },
+          "acao": "pendente_debito",
+          "ncodcc_destino": 9064886018,
+          "descricao_destino": "Stone - Cartão de Débito",
+          "observacao": "Pendencia: validar tratativa do debito Stone (freelancer/motoboy via Pix vs. lancamento em Stone - Cartão de Débito)."
+        }
+      ]
     },
     {
-      "nome": "iFood",
-      "match": { "tipo": "contem", "valor": "IFOODCOM" },
-      "acao": "incluir_lanc_cc",
-      "ncodcc_destino": null,
-      "ccodcateg": null
-    },
-    {
-      "nome": "Pix Maquininha",
-      "match": { "tipo": "sufixo", "valor": " - Pix | Maquininha" },
-      "acao": "incluir_lanc_cc",
-      "ncodcc_destino": null,
-      "ccodcateg": null
-    }
-  ],
-  "regras_debito": [
-    {
-      "nome": "Pagamento a fornecedor",
-      "match": { "tipo": "sufixo", "valor": " - Pagamento" },
-      "acao": "baixar_conta_pagar"
-    },
-    {
-      "nome": "Pagamento freelancer/motoboy (Pix)",
-      "match": { "tipo": "sufixo", "valor": " - Transferência | Pix" },
-      "acao": "pendente_p4",
-      "observacao": "Pendencia P4: definir tratativa (conta de mao de obra / busca em CP / lista de nomes). Por ora, classificado como pendente para nao ir ao manual silenciosamente."
+      "nome": "Sicredi",
+      "match_origem": { "bankid": "748", "acctid": "2580000000157815" },
+      "ncodcc_omie": 9062604986,
+      "descricao_origem": "Sicredi",
+      "regras_credito": [
+        {
+          "nome": "Sodexo (Pluxee)",
+          "match": { "tipo": "contem", "valor": "PLUXEE" },
+          "acao": "incluir_lanc_cc",
+          "ncodcc_destino": 9127278683,
+          "descricao_destino": "Sodexo",
+          "ccodcateg": null
+        },
+        {
+          "nome": "Alelo",
+          "match": { "tipo": "contem", "valor": "ALELO" },
+          "acao": "incluir_lanc_cc",
+          "ncodcc_destino": 9127278424,
+          "descricao_destino": "Alelo",
+          "ccodcateg": null
+        },
+        {
+          "nome": "iFood (repasse via Banco Topazio)",
+          "match": { "tipo": "contem", "valor": "TOPAZIO" },
+          "acao": "incluir_lanc_cc",
+          "ncodcc_destino": 9078464090,
+          "descricao_destino": "iFood",
+          "ccodcateg": null
+        }
+      ],
+      "regras_debito": [
+        {
+          "nome": "Integralizacao de capital",
+          "match": { "tipo": "contem", "valor": "INTEGR.CAPITAL" },
+          "acao": "incluir_lanc_cc",
+          "ncodcc_destino": 9081411426,
+          "descricao_destino": "Integralização de Capital",
+          "ccodcateg": null
+        }
+      ]
     }
   ]
 }
