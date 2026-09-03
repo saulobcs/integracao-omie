@@ -12,8 +12,11 @@ fluxo (parser, regras, relatorio) nao muda.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from typing import Any, Dict, Optional
 
+from .matching_debito import casar_debito
+from .omie_client import OmieClient
 from .parser_ofx import Transacao
 from .regras import Decisao
 
@@ -59,11 +62,16 @@ class ExecutorDryRun(ExecutorAcao):
         config: Dict[str, Any],
         origem: Optional[Dict[str, Any]] = None,
         plano_contas: Optional[Dict[int, str]] = None,
+        client: Optional[OmieClient] = None,
     ):
         self.config = config
         self.origem = origem or {}
         # Mapa nCodCC -> descricao (do contas-haru.json), para exibir '(nCodCC) descricao'.
         self.plano_contas = plano_contas or {}
+        # Cliente Omie read-only (opcional). Se presente, o debito e casado
+        # consultando a API (PesquisarLancamentos + ConsultarCliente). Sem
+        # cliente, apenas o payload proposto e registrado.
+        self.client = client
         # nCodCC da conta de origem selecionada (pode ser None enquanto pendente P1).
         self.ncodcc_origem = self.origem.get("ncodcc_omie")
         # Conta de origem ja formatada como '(nCodCC) descricao'.
@@ -113,30 +121,62 @@ class ExecutorDryRun(ExecutorAcao):
 
         elif decisao.rota == "baixa_conta_pagar":
             base["endpoint"] = "/api/v1/financas/pesquisartitulos/"
-            base["call"] = "PesquisarLancamentos -> baixa"
-            data = _fmt_data(t)
-            base["payload_proposto"] = {
-                "busca_titulo": {
-                    "call": "PesquisarLancamentos",
-                    "param": [
-                        {
-                            "nPagina": 1,
-                            "nRegPorPagina": 20,
-                            "cNatureza": "P",
-                            "cStatus": "EMABERTO",
-                            "dDtVencDe": data,
-                            "dDtVencAte": data,
-                        }
-                    ],
-                },
-                "match_valor_client_side": abs(float(t.valor)),
-                "memo_ofx": t.memo,
-                "observacao": (
-                    "A API nao filtra por valor: filtrar cabecTitulo.nValorTitulo "
-                    "no cliente. 1 titulo EMABERTO casando -> baixar (contapagar/); "
-                    "0 ou >1 -> manual."
-                ),
-            }
+            base["call"] = "PesquisarLancamentos -> ConsultarCliente"
+            if self.client is not None:
+                # Executa o matching real (read-only): pesquisa titulos em aberto,
+                # casa por valor exato e testa nome_fantasia no memo.
+                match = casar_debito(self.client, Decimal(str(t.valor)), t.memo)
+                base["payload_proposto"] = {
+                    "match_status": match.status,
+                    "ncod_titulo": match.ncod_titulo,
+                    "ncod_cliente": match.ncod_cliente,
+                    "nome_fantasia": match.nome_fantasia,
+                    "razao_social": match.razao_social,
+                    "valor_titulo": match.valor_titulo,
+                    "candidatos_valor_exato": match.candidatos_valor_exato,
+                    "trilha": match.trilha,
+                }
+                base["motivo"] = match.motivo
+                if match.status == "casado":
+                    # Titulo identificado: a baixa (escrita) fica fora do dry-run.
+                    base["conta_destino"] = f"titulo {match.ncod_titulo} ({match.razao_social})"
+                    base["payload_proposto"]["baixa_proposta"] = {
+                        "endpoint": "/api/v1/financas/contapagar/",
+                        "call": "LancarPagamento",
+                        "codigo_lancamento": match.ncod_titulo,
+                        "valor": abs(float(t.valor)),
+                        "data": _fmt_data(t),
+                        "observacao": f"Conciliacao OFX - FITID {t.fitid}",
+                        "nota": "NAO executado no dry-run (metodo de escrita).",
+                    }
+                else:
+                    # manual/erro: nao ha titulo unico casado -> revisao humana.
+                    base["rota"] = "manual" if match.status == "manual" else base["rota"]
+            else:
+                # Sem cliente/credenciais: apenas descreve o que seria feito.
+                data = _fmt_data(t)
+                base["payload_proposto"] = {
+                    "busca_titulo": {
+                        "call": "PesquisarLancamentos",
+                        "param": [
+                            {
+                                "nPagina": 1,
+                                "nRegPorPagina": 100,
+                                "cNatureza": "P",
+                                "cStatus": "EMABERTO",
+                                "dDtVencDe": "<hoje-5d>",
+                                "dDtVencAte": "<hoje+5d>",
+                            }
+                        ],
+                    },
+                    "match_valor_client_side": abs(float(t.valor)),
+                    "memo_ofx": t.memo,
+                    "observacao": (
+                        "Sem credenciais (.env): matching nao executado. Com .env, "
+                        "casa por valor exato (nValorTitulo) + nome_fantasia "
+                        "(ConsultarCliente) contido no memo."
+                    ),
+                }
 
         elif decisao.rota == "pendente_debito":
             base["conta_destino"] = _fmt_conta(

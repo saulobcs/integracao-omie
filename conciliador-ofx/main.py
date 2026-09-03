@@ -23,6 +23,8 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from conciliador.acoes import ExecutorDryRun
+from conciliador.config_env import carregar_credenciais
+from conciliador.omie_client import OmieClient
 from conciliador.parser_ofx import parse_ofx
 from conciliador.regras import MotorDeRegras
 from conciliador.relatorio import (
@@ -58,12 +60,23 @@ def processar(
     ofx_path: str,
     config_path: str,
     plano_contas_path: str = _PLANO_CONTAS_PADRAO,
+    usar_api: bool = True,
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     extrato = parse_ofx(ofx_path)
     motor = MotorDeRegras.de_arquivo(config_path)
     origem = motor.selecionar_origem(extrato)
     plano_contas = carregar_plano_contas(plano_contas_path)
-    executor = ExecutorDryRun(motor.config, origem, plano_contas)
+
+    # Cliente Omie read-only: so e criado se houver credenciais no .env e a
+    # consulta via API estiver habilitada. Sem isso, o debito cai no modo
+    # "payload proposto" (sem chamadas).
+    client = None
+    if usar_api:
+        cred = carregar_credenciais()
+        if cred.completo:
+            client = OmieClient(cred, somente_leitura=True)
+
+    executor = ExecutorDryRun(motor.config, origem, plano_contas, client=client)
 
     registros: List[Dict[str, Any]] = []
     for t in extrato.transacoes:
@@ -105,9 +118,14 @@ def main() -> None:
     ap.add_argument("--ofx", default=_OFX_PADRAO, help="Caminho do arquivo OFX")
     ap.add_argument("--config", default=_CONFIG_PADRAO, help="Caminho do JSON de roteamento")
     ap.add_argument("--saida", default=_SAIDA_PADRAO, help="Pasta de saida dos relatorios")
+    ap.add_argument(
+        "--sem-api",
+        action="store_true",
+        help="Nao consulta a API Omie (mesmo com .env): so registra o payload proposto.",
+    )
     args = ap.parse_args()
 
-    registros, resumo = processar(args.ofx, args.config)
+    registros, resumo = processar(args.ofx, args.config, usar_api=not args.sem_api)
 
     os.makedirs(args.saida, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")

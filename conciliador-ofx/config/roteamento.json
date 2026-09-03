@@ -37,18 +37,14 @@
         {
           "nome": "Pagamento a fornecedor (Débito)",
           "match": { "tipo": "sufixo", "valor": " - Pagamento" },
-          "acao": "pendente_debito",
-          "ncodcc_destino": 9064886018,
-          "descricao_destino": "Stone - Cartão de Débito",
-          "observacao": "Pendencia: validar tratativa do debito Stone (baixa de conta a pagar vs. lancamento em Stone - Cartão de Débito)."
+          "acao": "baixar_conta_pagar",
+          "observacao": "Debito: pesquisar titulo a pagar em aberto (venc hoje +-5d), casar por valor exato + nome_fantasia contido no memo."
         },
         {
           "nome": "Pagamento via PIX (Transferência)",
           "match": { "tipo": "sufixo", "valor": " - Transferência | Pix" },
-          "acao": "pendente_debito",
-          "ncodcc_destino": 9064886018,
-          "descricao_destino": "Stone - Cartão de Débito",
-          "observacao": "Pendencia: validar tratativa do debito Stone (freelancer/motoboy via Pix vs. lancamento em Stone - Cartão de Débito)."
+          "acao": "baixar_conta_pagar",
+          "observacao": "Debito: pesquisar titulo a pagar em aberto (venc hoje +-5d), casar por valor exato + nome_fantasia contido no memo."
         }
       ]
     },
