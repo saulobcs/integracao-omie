@@ -220,19 +220,32 @@ curl -sS -X POST "${OMIE_BASE}/financas/contacorrentelancamentos/" \
 
 ---
 
-## 3. PesquisarTitulos — localizar título a pagar (rota `baixa_conta_pagar`)
+## 3. PesquisarLancamentos — localizar título a pagar (rota `baixa_conta_pagar`)
 
 Endpoint: `/financas/pesquisartitulos/`
+
+> **Correções confirmadas pelo WSDL oficial** (`/financas/pesquisartitulos/?WSDL`,
+> tipo `ltPesquisarRequest`):
+> - O `call` e **`PesquisarLancamentos`** (nao `PesquisarTitulos` — este retorna
+>   `Method "PesquisarTitulos" not exists`).
+> - Paginacao usa **`nPagina`** / **`nRegPorPagina`** (nao `pagina`/`registros_por_pagina`).
+> - **Nao existe filtro `dDtVenc`** — as datas sao por INTERVALO: **`dDtVencDe`** /
+>   **`dDtVencAte`** (idem emissao `dDtEmisDe/Ate`, previsao `dDtPrevDe/Ate`, etc.).
+> - **Nao existe filtro `nValorTitulo`** no request — o valor so vem na resposta
+>   (`cabecTitulo.nValorTitulo`). O matching por valor e feito no cliente, sobre
+>   os titulos retornados.
 
 ### Inputs (parâmetros)
 
 ```bash
 export CNATUREZA="P"                 # P (pagar) / R (receber)
-export VALOR_TITULO="0.00"           # valor do título (do débito OFX)
-export DT_VENC="dd/mm/aaaa"          # data (vencimento) — apoio no matching
+export DT_VENC_DE="dd/mm/aaaa"       # inicio da janela de vencimento
+export DT_VENC_ATE="dd/mm/aaaa"      # fim da janela de vencimento (pode = DT_VENC_DE)
 export STATUS_TITULO="EMABERTO"      # EMABERTO/ATRASADO/LIQUIDADO...
 export PAGINA_TIT="1"
 export REGISTROS_TIT="20"
+# valor NAO e filtro da API: usado so no matching client-side (do debito OFX).
+export VALOR_TITULO="0.00"
 ```
 
 ### curl
@@ -241,23 +254,24 @@ export REGISTROS_TIT="20"
 curl -sS -X POST "${OMIE_BASE}/financas/pesquisartitulos/" \
   -H "Content-Type: application/json" \
   -d '{
-    "call": "PesquisarTitulos",
+    "call": "PesquisarLancamentos",
     "app_key": "'"${OMIE_APP_KEY}"'",
     "app_secret": "'"${OMIE_APP_SECRET}"'",
     "param": [
       {
-        "pagina": '"${PAGINA_TIT}"',
-        "registros_por_pagina": '"${REGISTROS_TIT}"',
+        "nPagina": '"${PAGINA_TIT}"',
+        "nRegPorPagina": '"${REGISTROS_TIT}"',
         "cNatureza": "'"${CNATUREZA}"'",
-        "nValorTitulo": '"${VALOR_TITULO}"',
-        "dDtVenc": "'"${DT_VENC}"'",
-        "cStatus": "'"${STATUS_TITULO}"'"
+        "cStatus": "'"${STATUS_TITULO}"'",
+        "dDtVencDe": "'"${DT_VENC_DE}"'",
+        "dDtVencAte": "'"${DT_VENC_ATE}"'"
       }
     ]
   }'
 ```
 
-> Regra: exatamente 1 título `EMABERTO` → seguir para a baixa (passo 4).
+> Regra: dos titulos retornados, filtre por valor (`cabecTitulo.nValorTitulo`
+> == valor do debito). Exatamente 1 `EMABERTO` casando → baixa (passo 4).
 > 0 ou >1 candidatos → fila manual. Capture o `nCodTitulo` do resultado.
 
 ---
@@ -347,7 +361,7 @@ curl -sS -X POST "${OMIE_BASE}/financas/extrato/" \
 | 1a | `ListarCategorias` | `/geral/categorias/` | Setup: valores de `cCodCateg` |
 | 1b | `PesquisarTipoDocumento` | `/geral/tiposdoc/` | Setup: valores de `cTipo` |
 | 2 | `IncluirLancCC` | `/financas/contacorrentelancamentos/` | Crédito roteado |
-| 3 | `PesquisarTitulos` | `/financas/pesquisartitulos/` | Débito: achar título |
+| 3 | `PesquisarLancamentos` | `/financas/pesquisartitulos/` | Débito: achar título |
 | 4 | `LancarPagamento` | `/financas/contapagar/` | Débito: baixar título |
 | 5 | `ExtratoContaCorrente` | `/financas/extrato/` | Conferência de saldo |
 

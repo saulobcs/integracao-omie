@@ -112,16 +112,30 @@ class ExecutorDryRun(ExecutorAcao):
             }
 
         elif decisao.rota == "baixa_conta_pagar":
-            base["endpoint"] = "/api/v1/financas/contapagar/"
-            base["call"] = "PesquisarTitulos -> baixa"
+            base["endpoint"] = "/api/v1/financas/pesquisartitulos/"
+            base["call"] = "PesquisarLancamentos -> baixa"
+            data = _fmt_data(t)
             base["payload_proposto"] = {
                 "busca_titulo": {
-                    "cNatureza": "P",
-                    "nValorTitulo": abs(float(t.valor)),
-                    "dDtPrevisao": _fmt_data(t),
-                    "cMemoOFX": t.memo,
+                    "call": "PesquisarLancamentos",
+                    "param": [
+                        {
+                            "nPagina": 1,
+                            "nRegPorPagina": 20,
+                            "cNatureza": "P",
+                            "cStatus": "EMABERTO",
+                            "dDtVencDe": data,
+                            "dDtVencAte": data,
+                        }
+                    ],
                 },
-                "observacao": "Se encontrar 1 titulo -> baixar; senao -> manual.",
+                "match_valor_client_side": abs(float(t.valor)),
+                "memo_ofx": t.memo,
+                "observacao": (
+                    "A API nao filtra por valor: filtrar cabecTitulo.nValorTitulo "
+                    "no cliente. 1 titulo EMABERTO casando -> baixar (contapagar/); "
+                    "0 ou >1 -> manual."
+                ),
             }
 
         elif decisao.rota == "pendente_debito":

@@ -45,7 +45,7 @@ Content-Type: application/json
 | (setup) categorias | `/geral/categorias/` | `ListarCategorias` | Descobrir valores válidos de `cCodCateg` |
 | (setup) tipos de documento | `/geral/tiposdoc/` | `PesquisarTipoDocumento` | Descobrir valores válidos de `cTipo` (PIX/DIN/BOL/TED...) |
 | credito_roteado | `/financas/contacorrentelancamentos/` | `IncluirLancCC` | Lançar crédito na conta destino |
-| baixa_conta_pagar (buscar) | `/financas/pesquisartitulos/` | `PesquisarTitulos` | Localizar o título a pagar |
+| baixa_conta_pagar (buscar) | `/financas/pesquisartitulos/` | `PesquisarLancamentos` | Localizar o título a pagar |
 | baixa_conta_pagar (baixar) | `/financas/contapagar/` | `LancarPagamento` | Dar baixa no título |
 | (conferência) | `/financas/extrato/` | `ExtratoContaCorrente` | Conferir saldo pós-processamento |
 
@@ -178,38 +178,54 @@ tipo de documento que vão em `detalhes.cTipo` do `IncluirLancCC`).
 
 ---
 
-## 3. `PesquisarTitulos` — localizar título a pagar (rota `baixa_conta_pagar`)
+## 3. `PesquisarLancamentos` — localizar título a pagar (rota `baixa_conta_pagar`)
 
 **Endpoint:** `/api/v1/financas/pesquisartitulos/`
 
-### Requisição (filtros principais)
+> **Correção confirmada pelo WSDL oficial** (`/financas/pesquisartitulos/?WSDL`):
+> o `call` correto é **`PesquisarLancamentos`** (não `PesquisarTitulos`, que
+> retorna `Method "PesquisarTitulos" not exists`). O tipo de request é
+> `ltPesquisarRequest`. Datas são por **intervalo** (De/Até) e **não há filtro
+> de valor** no request.
+
+### Requisição (filtros principais — tipo `ltPesquisarRequest`)
 | Campo | Tipo | Descrição |
 |-------|------|-----------|
+| `nPagina` | integer | **Página (inicia em 1)** — obrigatório |
+| `nRegPorPagina` | integer | **Registros por página** — obrigatório |
 | `cNatureza` | string(1) | **P** (pagar) / R (receber) |
-| `nValorTitulo` | decimal | Valor do título |
-| `dDtVenc` | date | Vencimento |
-| `cCPFCNPJCliente` | string | Documento da contraparte |
 | `cStatus` | string | EMABERTO/ATRASADO/LIQUIDADO/RECEBIDO... |
+| `dDtVencDe` / `dDtVencAte` | date | **Vencimento por intervalo** (dd/mm/aaaa) |
+| `dDtEmisDe` / `dDtEmisAte` | date | Emissão por intervalo |
+| `dDtPrevDe` / `dDtPrevAte` | date | Previsão por intervalo |
+| `cCPFCNPJCliente` | string | Documento da contraparte |
 | `cTipo`, `cOperacao`, `cChaveNFe` | string | Filtros adicionais |
+| `cCodCateg` | string | Categoria |
+| `nCodCC` | integer | Conta corrente |
 | `nCodTitulo` / `cCodIntTitulo` | int/string | Busca direta por ID |
 
-### Resposta (por título)
+> **Não existem** os filtros `dDtVenc` (data única) nem `nValorTitulo` no request.
+
+### Resposta (por título — `titulosEncontrados[].cabecTitulo`)
 | Campo | Descrição |
 |-------|-----------|
 | `nCodTitulo` | **ID do título** (usado depois no `LancarPagamento`) |
 | `cCodIntTitulo` | Código de integração do título |
 | `cStatus` | Situação atual |
-| `nValorTitulo` | Valor |
+| `nValorTitulo` | Valor (só na resposta — usar no matching client-side) |
 | `dDtVenc` | Vencimento |
 
 ### Pode / Não pode
-- **Pode:** buscar candidatos a baixa por valor + status EMABERTO/ATRASADO.
-- **NÃO PODE (limitação real):** o OFX **não traz CPF/CNPJ nem número de
-  documento** — só nome no MEMO. Então a busca fica por **valor + data**, o que
-  pode retornar **múltiplos candidatos** (há valores repetidos no extrato). O
-  filtro por documento, que seria o mais preciso, não é alimentável pelo OFX.
-- **Regra:** achou exatamente 1 título EMABERTO → seguir p/ baixa. 0 ou >1 →
-  fila manual.
+- **Pode:** buscar candidatos a baixa por natureza + status + **janela de
+  vencimento** (`dDtVencDe`/`dDtVencAte`).
+- **NÃO PODE — filtrar por valor na API:** `ltPesquisarRequest` não tem
+  `nValorTitulo`. O casamento por valor é feito **no cliente**, comparando
+  `cabecTitulo.nValorTitulo` de cada título retornado com o valor do débito OFX.
+- **NÃO PODE (limitação do OFX):** o OFX **não traz CPF/CNPJ nem número de
+  documento** — só nome no MEMO. A busca fica por **data + status** e o valor é
+  conferido depois, o que pode gerar **múltiplos candidatos** (valores repetidos).
+- **Regra:** dos retornados, filtrar por valor → exatamente 1 EMABERTO casando →
+  seguir p/ baixa. 0 ou >1 → fila manual.
 
 ---
 

@@ -180,9 +180,9 @@
     "/financas/pesquisartitulos/": {
       "post": {
         "tags": ["Debito"],
-        "summary": "PesquisarTitulos - localizar titulo a pagar",
-        "operationId": "pesquisarTitulos",
-        "description": "Busca candidatos a baixa por valor + data + status (rota baixa_conta_pagar).\n\nO OFX nao traz CPF/CNPJ, entao o matching e por valor + data. Regra: exatamente 1 titulo EMABERTO -> seguir para baixa. 0 ou >1 -> fila manual. Capture nCodTitulo do resultado.",
+        "summary": "PesquisarLancamentos - localizar titulo a pagar",
+        "operationId": "pesquisarLancamentos",
+        "description": "Busca candidatos a baixa por natureza + status + janela de vencimento (rota baixa_conta_pagar).\n\nConfirmado pelo WSDL (tipo ltPesquisarRequest): o call e PesquisarLancamentos (NAO PesquisarTitulos). Paginacao usa nPagina/nRegPorPagina. Datas sao por intervalo (dDtVencDe/dDtVencAte). NAO existe filtro nValorTitulo no request: o valor vem so na resposta (cabecTitulo.nValorTitulo) e o matching por valor e feito no cliente.\n\nO OFX nao traz CPF/CNPJ, entao o matching e por data + valor (client-side). Regra: exatamente 1 titulo EMABERTO casando -> baixa. 0 ou >1 -> fila manual.",
         "requestBody": {
           "required": true,
           "content": {
@@ -190,7 +190,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "call": { "type": "string", "example": "PesquisarTitulos" },
+                  "call": { "type": "string", "example": "PesquisarLancamentos" },
                   "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
                   "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
                   "param": {
@@ -198,29 +198,29 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "pagina": { "type": "integer", "example": 1 },
-                        "registros_por_pagina": { "type": "integer", "example": 20 },
+                        "nPagina": { "type": "integer", "description": "Pagina (inicia em 1) - obrigatorio", "example": 1 },
+                        "nRegPorPagina": { "type": "integer", "description": "Registros por pagina - obrigatorio", "example": 20 },
                         "cNatureza": { "type": "string", "description": "P (pagar) / R (receber)", "example": "P" },
-                        "nValorTitulo": { "type": "number", "description": "Valor do titulo (do debito OFX)", "example": 350.00 },
-                        "dDtVenc": { "type": "string", "description": "Data dd/mm/aaaa (apoio)", "example": "27/08/2026" },
-                        "cStatus": { "type": "string", "description": "EMABERTO/ATRASADO/LIQUIDADO...", "example": "EMABERTO" }
+                        "cStatus": { "type": "string", "description": "EMABERTO/ATRASADO/LIQUIDADO...", "example": "EMABERTO" },
+                        "dDtVencDe": { "type": "string", "description": "Inicio da janela de vencimento dd/mm/aaaa", "example": "27/08/2026" },
+                        "dDtVencAte": { "type": "string", "description": "Fim da janela de vencimento dd/mm/aaaa (pode = dDtVencDe)", "example": "27/08/2026" }
                       }
                     }
                   }
                 }
               },
               "example": {
-                "call": "PesquisarTitulos",
+                "call": "PesquisarLancamentos",
                 "app_key": "{{OMIE_APP_KEY}}",
                 "app_secret": "{{OMIE_APP_SECRET}}",
                 "param": [
                   {
-                    "pagina": 1,
-                    "registros_por_pagina": 20,
+                    "nPagina": 1,
+                    "nRegPorPagina": 20,
                     "cNatureza": "P",
-                    "nValorTitulo": 350.00,
-                    "dDtVenc": "27/08/2026",
-                    "cStatus": "EMABERTO"
+                    "cStatus": "EMABERTO",
+                    "dDtVencDe": "27/08/2026",
+                    "dDtVencAte": "27/08/2026"
                   }
                 ]
               }
@@ -233,8 +233,10 @@
             "content": {
               "application/json": {
                 "example": {
-                  "pagina": 1,
-                  "total_de_paginas": 1,
+                  "nPagina": 1,
+                  "nTotPaginas": 1,
+                  "nRegistros": 1,
+                  "nTotRegistros": 1,
                   "titulosEncontrados": [
                     {
                       "cabecTitulo": {
@@ -274,7 +276,7 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "codigo_lancamento": { "type": "integer", "description": "nCodTitulo (do PesquisarTitulos)", "example": 555111222 },
+                        "codigo_lancamento": { "type": "integer", "description": "nCodTitulo (do PesquisarLancamentos)", "example": 555111222 },
                         "valor": { "type": "number", "description": "Valor pago", "example": 350.00 },
                         "data": { "type": "string", "description": "Data da baixa dd/mm/aaaa", "example": "27/08/2026" },
                         "id_conta_corrente": { "type": "integer", "description": "nCodCC de saida do pagamento", "example": 123456789 },

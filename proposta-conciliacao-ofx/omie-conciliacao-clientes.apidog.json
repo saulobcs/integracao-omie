@@ -1,0 +1,130 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Omie - Conciliacao OFX (Clientes / resolucao de nome)",
+    "version": "1.0.0",
+    "description": "Chamadas para resolver o NOME do cliente/fornecedor a partir de um titulo. O PesquisarLancamentos (/financas/pesquisartitulos/) retorna cabecTitulo.nCodCliente e cabecTitulo.cCPFCNPJCliente, mas NAO retorna o nome. Para obter razao_social / nome_fantasia use as chamadas abaixo (endpoint /geral/clientes/).\n\nFluxo: PesquisarLancamentos -> cabecTitulo.nCodCliente -> ConsultarCliente(codigo_cliente_omie) -> razao_social / nome_fantasia.\n\nAutenticacao: a Omie NAO possui endpoint de auth separado. As credenciais app_key/app_secret vao no corpo de cada chamada. Use as variaveis de ambiente do Apidog: {{OMIE_APP_KEY}} e {{OMIE_APP_SECRET}}.\n\nCampos confirmados pelo WSDL oficial /geral/clientes/?WSDL (tipos clientes_cadastro_chave, clientes_cadastro, clientes_list_request).\n\nSempre inspecione o corpo da resposta: a Omie pode retornar erro de negocio com faultstring/faultcode mesmo em HTTP != 200."
+  },
+  "servers": [
+    {
+      "url": "{{OMIE_BASE}}",
+      "description": "Base da API Omie",
+      "variables": {
+        "OMIE_BASE": {
+          "default": "https://app.omie.com.br/api/v1"
+        }
+      }
+    }
+  ],
+  "tags": [
+    { "name": "Clientes", "description": "Resolucao do nome do cliente/fornecedor de um titulo" }
+  ],
+  "paths": {
+    "/geral/clientes/": {
+      "post": {
+        "tags": ["Clientes"],
+        "summary": "ConsultarCliente / ListarClientes - resolver nome do cliente",
+        "operationId": "consultarCliente",
+        "description": "Duas formas de obter o nome do cliente/fornecedor:\n\n1) ConsultarCliente (chave direta): passe codigo_cliente_omie = cabecTitulo.nCodCliente. Retorna o cadastro completo (razao_social, nome_fantasia, cnpj_cpf).\n\n2) ListarClientes (por filtro): quando so tiver o CPF/CNPJ (cabecTitulo.cCPFCNPJCliente), filtre por clientesFiltro.cnpj_cpf. Retorna clientes_cadastro[] com razao_social/nome_fantasia.\n\nO example padrao usa ConsultarCliente. O corpo do ListarClientes esta no campo description e como example alternativo abaixo.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call": { "type": "string", "description": "ConsultarCliente | ListarClientes", "example": "ConsultarCliente" },
+                  "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
+                  "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
+                  "param": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "codigo_cliente_omie": { "type": "integer", "description": "ConsultarCliente: nCodCliente vindo do titulo", "example": 123456789 },
+                        "codigo_cliente_integracao": { "type": "string", "description": "ConsultarCliente: alternativa por codigo de integracao", "example": "" }
+                      }
+                    }
+                  }
+                }
+              },
+              "examples": {
+                "ConsultarCliente_por_codigo": {
+                  "summary": "ConsultarCliente pelo nCodCliente do titulo",
+                  "value": {
+                    "call": "ConsultarCliente",
+                    "app_key": "{{OMIE_APP_KEY}}",
+                    "app_secret": "{{OMIE_APP_SECRET}}",
+                    "param": [
+                      {
+                        "codigo_cliente_omie": 123456789
+                      }
+                    ]
+                  }
+                },
+                "ListarClientes_por_cpfcnpj": {
+                  "summary": "ListarClientes filtrando por CPF/CNPJ",
+                  "value": {
+                    "call": "ListarClientes",
+                    "app_key": "{{OMIE_APP_KEY}}",
+                    "app_secret": "{{OMIE_APP_SECRET}}",
+                    "param": [
+                      {
+                        "pagina": 1,
+                        "registros_por_pagina": 50,
+                        "clientesFiltro": {
+                          "cnpj_cpf": "00000000000000"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cadastro do cliente (ConsultarCliente) ou lista (ListarClientes)",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "ConsultarCliente": {
+                    "summary": "Resposta do ConsultarCliente",
+                    "value": {
+                      "codigo_cliente_omie": 123456789,
+                      "codigo_cliente_integracao": "",
+                      "razao_social": "OESA COMERCIO E REPRESENTACOES S A",
+                      "nome_fantasia": "OESA",
+                      "cnpj_cpf": "00000000000000"
+                    }
+                  },
+                  "ListarClientes": {
+                    "summary": "Resposta do ListarClientes",
+                    "value": {
+                      "pagina": 1,
+                      "total_de_paginas": 1,
+                      "registros": 1,
+                      "total_de_registros": 1,
+                      "clientes_cadastro": [
+                        {
+                          "codigo_cliente_omie": 123456789,
+                          "razao_social": "OESA COMERCIO E REPRESENTACOES S A",
+                          "nome_fantasia": "OESA",
+                          "cnpj_cpf": "00000000000000"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {}
+  }
+}
