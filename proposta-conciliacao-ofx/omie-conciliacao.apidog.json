@@ -99,7 +99,7 @@
         "tags": ["Credito"],
         "summary": "IncluirLancCC - lancar credito roteado",
         "operationId": "incluirLancCC",
-        "description": "Lanca um credito na conta destino mapeada (rota credito_roteado).\n\ncCodIntLanc e string(20) obrigatoria (ancora de idempotencia). O FITID da Stone e UUID(36) e NAO cabe: derive via hash deterministico (ex.: 20 primeiros hex de sha256(fitid)) - ver pendencia P3.1.\n\nPara transferencia entre contas, inclua o bloco transferencia.nCodCCDestino.",
+        "description": "Lanca um credito na conta destino mapeada (rota credito_roteado).\n\ncCodIntLanc e string(20) obrigatoria (ancora de idempotencia). O FITID da Stone e UUID(36) e NAO cabe: e derivado via hash deterministico (20 primeiros hex de sha256(fitid)) - P3.1 RESOLVIDA, implementado em acoes.py::_derivar_ccodintlanc.\n\nPara transferencia entre contas, inclua o bloco transferencia.nCodCCDestino.",
         "requestBody": {
           "required": true,
           "content": {

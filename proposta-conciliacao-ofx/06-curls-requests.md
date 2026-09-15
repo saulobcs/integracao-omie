@@ -175,7 +175,8 @@ Endpoint: `/financas/contacorrentelancamentos/`
 ```bash
 # cCodIntLanc: string(20) obrigatória — âncora de idempotência.
 # O FITID da Stone é UUID(36) e NÃO cabe: derive via hash determinístico.
-# Ex.: 20 primeiros hex do sha256 do FITID (ver pendência P3.1).
+# 20 primeiros hex do sha256 do FITID (P3.1 RESOLVIDA -- mesma logica do
+# conciliador em acoes.py::_derivar_ccodintlanc). Este comando reproduz a derivacao:
 export FITID="COLE_O_FITID_AQUI"
 export CCODINTLANC="$(printf '%s' "${FITID}" | shasum -a 256 | cut -c1-20)"
 
@@ -366,6 +367,7 @@ curl -sS -X POST "${OMIE_BASE}/financas/extrato/" \
 | 5 | `ExtratoContaCorrente` | `/financas/extrato/` | Conferência de saldo |
 
 > Notas de pendência que afetam os inputs acima: **P1** (obter `nCodCC`),
-> **P3/P3.1** (idempotência e derivação FITID→`cCodIntLanc`), **P4** (débitos
+> **P3** (idempotência do `cCodIntLanc` duplicado; **P3.1 já resolvida** — derivação
+> FITID→`cCodIntLanc` implementada em `acoes.py`), **P4** (débitos
 > Pix de mão de obra) e **P6** (estornos). Ver
 > [`04-pendencias.md`](./04-pendencias.md).

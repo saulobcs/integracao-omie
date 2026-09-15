@@ -48,19 +48,21 @@ regenera a cada exportação?
 
 ### P3.1 — Derivação FITID → `cCodIntLanc` (limite de 20 caracteres)
 
-**Status:** aberto — decisão técnica.
+**Status:** RESOLVIDO — implementado no conciliador.
 
 O `cCodIntLanc` do `IncluirLancCC` é **string(20)** e **obrigatório**, mas o FITID
 da Stone é um **UUID de 36 caracteres** — não cabe direto (ver
 [`05-analise-endpoints.md`](./05-analise-endpoints.md), seção 2).
 
-**Proposta:** derivar `cCodIntLanc` de um **hash determinístico** do FITID (ex.:
-20 primeiros hex de `sha256(fitid)`), garantindo que o mesmo FITID gere sempre o
-mesmo código (idempotência) e caiba em 20 chars. Persistir o vínculo
-`FITID ⇄ cCodIntLanc ⇄ nCodLanc/codigo_baixa` na tabela de rastreio.
+**Solução implementada:** a função `_derivar_ccodintlanc` em
+`conciliador-ofx/conciliador/acoes.py` deriva o `cCodIntLanc` de um **hash
+determinístico** do FITID: se o FITID couber em 20 chars, usa ele direto; caso
+contrário, usa os **20 primeiros hex de `sha256(fitid)`**. Determinístico → o
+mesmo FITID sempre gera o mesmo código (idempotência preservada). O FITID
+original é mantido no payload como `fitid_origem` para rastreio.
 
-**A validar:** risco de colisão (desprezível no volume atual) e se 20 hex são
-suficientes; se necessário, usar base62 para caber mais entropia em 20 chars.
+**A validar (residual):** risco de colisão é desprezível no volume atual; se for
+preciso mais entropia em 20 chars, migrar para base62.
 
 ---
 

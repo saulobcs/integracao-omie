@@ -11,6 +11,7 @@ fluxo (parser, regras, relatorio) nao muda.
 
 from __future__ import annotations
 
+import hashlib
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Any, Dict, Optional
@@ -19,6 +20,28 @@ from .matching_debito import casar_debito
 from .omie_client import OmieClient
 from .parser_ofx import Transacao
 from .regras import Decisao
+
+# Limite do campo cCodIntLanc na API Omie (string 20). O FITID da Stone e um
+# UUID de 36 caracteres e NAO cabe direto -- por isso derivamos um codigo curto.
+_CCODINTLANC_MAX = 20
+
+
+def _derivar_ccodintlanc(fitid: Optional[str]) -> Optional[str]:
+    """Deriva o cCodIntLanc (<=20 chars) a partir do FITID do extrato.
+
+    O FITID (UUID de 36 chars) nao cabe no campo cCodIntLanc (string 20) da
+    Omie. Se couber (<=20), usa o proprio FITID. Caso contrario, gera um hash
+    DETERMINISTICO: os 20 primeiros hex do SHA-256 do FITID. Deterministico =>
+    o mesmo FITID sempre gera o mesmo codigo, preservando a idempotencia
+    server-side (reenvio do mesmo lancamento e reconhecido).
+    """
+    if not fitid:
+        return None
+    fitid = fitid.strip()
+    if len(fitid) <= _CCODINTLANC_MAX:
+        return fitid
+    digest = hashlib.sha256(fitid.encode("utf-8")).hexdigest()
+    return digest[:_CCODINTLANC_MAX]
 
 
 def _fmt_data(t: Transacao) -> Optional[str]:
@@ -116,7 +139,10 @@ class ExecutorDryRun(ExecutorAcao):
                     "cCodCateg": decisao.ccodcateg,  # placeholder (pendencia P1)
                     "cTipo": "PIX",
                 },
-                "cCodIntLanc": t.fitid,  # ancora de idempotencia (pendencia P3)
+                # cCodIntLanc: <=20 chars derivado do FITID (hash deterministico
+                # se o FITID exceder 20). fitid_origem preservado p/ rastreio.
+                "cCodIntLanc": _derivar_ccodintlanc(t.fitid),
+                "fitid_origem": t.fitid,
             }
 
         elif decisao.rota == "baixa_conta_pagar":

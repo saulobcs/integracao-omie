@@ -165,11 +165,12 @@ tipo de documento que vão em `detalhes.cTipo` do `IncluirLancCC`).
 ### Pode / Não pode
 - **Pode:** criar um lançamento de crédito na conta destino com um identificador
   próprio (`cCodIntLanc`).
-- **PONTO CRÍTICO — limite de 20 caracteres:** `cCodIntLanc` é **string(20)**, mas
-  o FITID da Stone é um **UUID de 36 caracteres**. **O FITID não cabe direto.**
-  Solução recomendada: gerar um **hash determinístico** do FITID truncado a 20
-  chars (ex.: 20 primeiros hex de um SHA-256 do FITID). Determinístico = mesmo
-  FITID gera sempre o mesmo `cCodIntLanc` → idempotência server-side preservada.
+- **Limite de 20 caracteres (RESOLVIDO):** `cCodIntLanc` é **string(20)**, mas
+  o FITID da Stone é um **UUID de 36 caracteres** — não cabe direto. Implementado
+  em `acoes.py` (`_derivar_ccodintlanc`): usa o FITID se couber em 20 chars, senão
+  os **20 primeiros hex de `sha256(fitid)`**. Determinístico = mesmo FITID gera
+  sempre o mesmo `cCodIntLanc` → idempotência server-side preservada. O FITID
+  original fica no payload como `fitid_origem`.
 - **Idempotência server-side:** sendo `cCodIntLanc` obrigatório e único, reenviar
   o mesmo código tende a ser rejeitado pela Omie (a confirmar o comportamento
   exato: erro vs. upsert).
@@ -309,7 +310,8 @@ tipo de documento que vão em `detalhes.cTipo` do `IncluirLancCC`).
 - **Não** garantir baixa imediata em contas a pagar se houver Fluxo de Aprovação
   configurado.
 - **Não** usar o FITID inteiro como código de integração em `IncluirLancCC`
-  (limite de 20 chars vs. UUID de 36) — exige hash/derivação.
+  (limite de 20 chars vs. UUID de 36). **Resolvido:** hash determinístico via
+  `_derivar_ccodintlanc` (`acoes.py`).
 
 ---
 
@@ -320,9 +322,10 @@ tipo de documento que vão em `detalhes.cTipo` do `IncluirLancCC`).
   para preencher o mapa de roteamento.
 - **P3** — confirmar, na página logada, os campos de idempotência/identificação em
   `IncluirLancCC` (comportamento do `cCodIntLanc` duplicado) e em `LancarPagamento`.
-- **Nova sub-pendência (P3.1):** definir a **estratégia de derivação do FITID → 
-  `cCodIntLanc`** (hash determinístico de 20 chars) e persistir o vínculo
-  FITID ⇄ cCodIntLanc ⇄ nCodLanc/codigo_baixa.
+- **P3.1 (RESOLVIDO):** derivação do FITID → `cCodIntLanc` implementada em
+  `acoes.py` (`_derivar_ccodintlanc`, hash determinístico de 20 chars). Falta
+  apenas persistir o vínculo FITID ⇄ cCodIntLanc ⇄ nCodLanc/codigo_baixa numa
+  tabela de rastreio quando a escrita for habilitada.
 
 ---
 
