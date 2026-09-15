@@ -20,6 +20,19 @@ A documentação detalhada fica na pasta [`docs-erp-omie/`](./docs-erp-omie/).
 | [docs-erp-omie/04-boas-praticas.md](./docs-erp-omie/04-boas-praticas.md) | Boas práticas de integração (paginação, listagem incremental, rate limit) |
 | [docs-erp-omie/05-exemplos-de-uso.md](./docs-erp-omie/05-exemplos-de-uso.md) | Exemplos práticos de chamadas (cURL, Python, PHP) |
 
+## Conciliador OFX → Omie
+
+Além da documentação da API, este repositório contém um **conciliador** em
+Python (`conciliador-ofx/`) que lê um extrato OFX, aplica regras de roteamento e
+gera um relatório das ações que seriam executadas no Omie. Ele roda em
+**dry-run** (somente leitura): nunca executa inclusão, baixa ou manutenção.
+
+- **Como executar o fluxo:** [`conciliador-ofx/COMO-EXECUTAR.md`](./conciliador-ofx/COMO-EXECUTAR.md)
+  — pré-requisitos, configuração de credenciais (`.env`), execução e saída.
+
+A análise dos endpoints e as coleções para importar no Apidog ficam em
+[`proposta-conciliacao-ofx/`](./proposta-conciliacao-ofx/).
+
 ## Resumo rápido
 
 - **Tipo de API:** REST sobre HTTP, com payload JSON (também há suporte a SOAP/WSDL).
