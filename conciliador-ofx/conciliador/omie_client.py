@@ -29,6 +29,8 @@ METODOS_LEITURA: Dict[str, str] = {
     "ListarCategorias": "geral/categorias/",
     "PesquisarTipoDocumento": "geral/tiposdoc/",
     "ExtratoContaCorrente": "financas/extrato/",
+    "ConsultaLancCC": "financas/contacorrentelancamentos/",
+    "ListarLancCC": "financas/contacorrentelancamentos/",
 }
 
 

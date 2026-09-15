@@ -94,8 +94,9 @@ class TestAllowListReadOnly(unittest.TestCase):
             )
 
     def test_allowlist_so_tem_consulta_e_pesquisa(self):
-        """Todo metodo da allow-list comeca com Pesquisar/Consultar/Listar/Extrato."""
-        prefixos_leitura = ("Pesquisar", "Consultar", "Listar", "Extrato")
+        """Todo metodo da allow-list comeca com Pesquisar/Consulta/Listar/Extrato."""
+        # "Consulta" cobre "ConsultarCliente" e "ConsultaLancCC" (sem o 'r').
+        prefixos_leitura = ("Pesquisar", "Consulta", "Listar", "Extrato")
         for call in METODOS_LEITURA:
             self.assertTrue(
                 call.startswith(prefixos_leitura),
