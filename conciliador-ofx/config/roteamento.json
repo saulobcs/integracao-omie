@@ -9,6 +9,14 @@
       "descricao_origem": "Stone",
       "regras_credito": [
         {
+          "nome": "Recebimento de vendas (Débito)",
+          "match": { "tipo": "contem", "valor": "Recebimento de vendas - Valor referente à liquidação de suas vendas de cartão" },
+          "acao": "incluir_lanc_cc",
+          "ncodcc_destino": 9064886018,
+          "descricao_destino": "Stone - Débito",
+          "ccodcateg": null
+        },
+        {
           "nome": "Recebimento de vendas (Credito)",
           "match": { "tipo": "igual", "valor": "Recebimento vendas - Antecipação" },
           "acao": "incluir_lanc_cc",
@@ -25,11 +33,11 @@
           "ccodcateg": null
         },
         {
-          "nome": "Recebimento via PIX (Transferência)",
-          "match": { "tipo": "sufixo", "valor": " - Transferência | Pix" },
+          "nome": "Recebimento iFood",
+          "match": { "tipo": "contem", "valor": "IFOODCOM AGENCIA DE RESTAURANTES ONLINE SA - Transferência | Pix" },
           "acao": "incluir_lanc_cc",
-          "ncodcc_destino": 9064890501,
-          "descricao_destino": "Stone - PIX",
+          "ncodcc_destino": 9078464090,
+          "descricao_destino": "iFood",
           "ccodcateg": null
         }
       ],
