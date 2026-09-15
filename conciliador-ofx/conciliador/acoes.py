@@ -48,6 +48,26 @@ def _fmt_data(t: Transacao) -> Optional[str]:
     return t.data_posted.strftime("%d/%m/%Y") if t.data_posted else None
 
 
+def _consultar_lancamento_existente(
+    client: OmieClient, ccodintlanc: str
+) -> Optional[int]:
+    """Consulta idempotencia via ConsultaLancCC pelo cCodIntLanc.
+
+    Retorna o nCodLanc se ja existir um lancamento com esse codigo de
+    integracao; None se nao existir. Erros de "nao encontrado" da Omie
+    (faultstring) sao tratados como "nao existe".
+    """
+    from .omie_client import OmieFault
+
+    try:
+        resp = client.chamar("ConsultaLancCC", {"cCodIntLanc": ccodintlanc})
+    except OmieFault:
+        # A Omie sinaliza inexistencia via faultstring -> tratamos como "nao existe".
+        return None
+    ncod = resp.get("nCodLanc") if isinstance(resp, dict) else None
+    return int(ncod) if ncod else None
+
+
 def _fmt_conta(
     ncodcc: Optional[int],
     plano_contas: Dict[int, str],
@@ -129,6 +149,9 @@ class ExecutorDryRun(ExecutorAcao):
             )
             base["endpoint"] = "/api/v1/financas/contacorrentelancamentos/"
             base["call"] = "IncluirLancCC"
+            # cCodIntLanc: <=20 chars derivado do FITID (hash deterministico se o
+            # FITID exceder 20). fitid_origem preservado p/ rastreio.
+            ccodintlanc = _derivar_ccodintlanc(t.fitid)
             base["payload_proposto"] = {
                 "cabecalho": {
                     "nCodCC": decisao.ncodcc_destino,  # placeholder (pendencia P1)
@@ -139,11 +162,33 @@ class ExecutorDryRun(ExecutorAcao):
                     "cCodCateg": decisao.ccodcateg,  # placeholder (pendencia P1)
                     "cTipo": "PIX",
                 },
-                # cCodIntLanc: <=20 chars derivado do FITID (hash deterministico
-                # se o FITID exceder 20). fitid_origem preservado p/ rastreio.
-                "cCodIntLanc": _derivar_ccodintlanc(t.fitid),
+                "cCodIntLanc": ccodintlanc,
                 "fitid_origem": t.fitid,
             }
+
+            # Idempotencia: antes de incluir, consulta se ja existe um lancamento
+            # com esse cCodIntLanc. Se existir, NAO inclui e registra "ja existe".
+            if self.client is not None and ccodintlanc:
+                ncod_existente = _consultar_lancamento_existente(self.client, ccodintlanc)
+                if ncod_existente is not None:
+                    base["call"] = "ConsultaLancCC (ja existe)"
+                    base["motivo"] = (
+                        f"Lancamento ja existe (nCodLanc {ncod_existente}) para "
+                        f"cCodIntLanc {ccodintlanc}. Nao incluido."
+                    )
+                    base["payload_proposto"]["idempotencia"] = {
+                        "ja_existe": True,
+                        "nCodLanc": ncod_existente,
+                        "cCodIntLanc": ccodintlanc,
+                        "consulta": "ConsultaLancCC",
+                    }
+                else:
+                    base["payload_proposto"]["idempotencia"] = {
+                        "ja_existe": False,
+                        "cCodIntLanc": ccodintlanc,
+                        "consulta": "ConsultaLancCC",
+                        "nota": "Nao existe -> apto a incluir (IncluirLancCC nao executado no dry-run).",
+                    }
 
         elif decisao.rota == "baixa_conta_pagar":
             base["endpoint"] = "/api/v1/financas/pesquisartitulos/"
