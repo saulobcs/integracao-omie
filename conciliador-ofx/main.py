@@ -22,7 +22,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List
 
-from conciliador.acoes import ExecutorDryRun
+from conciliador.acoes import ExecutorApply, ExecutorDryRun
 from conciliador.config_env import carregar_credenciais
 from conciliador.omie_client import OmieClient
 from conciliador.parser_ofx import parse_ofx
@@ -56,27 +56,47 @@ def carregar_plano_contas(caminho: str) -> Dict[int, str]:
     return {int(c["nCodCC"]): c.get("descricao", "") for c in contas if "nCodCC" in c}
 
 
+def _criar_executor(modo: str, config, origem, plano_contas):
+    """Cria o executor conforme o modo.
+
+    - 'offline'  : dry-run sem API (nenhuma chamada; so payload proposto).
+    - 'dry-run'  : dry-run com consulta read-only (idempotencia/matching).
+    - 'apply'    : EXECUCAO final -- cliente read-write, escreve no Omie.
+
+    Retorna (executor, info_modo) onde info_modo descreve o cliente usado.
+    """
+    cred = carregar_credenciais()
+
+    if modo == "offline":
+        return ExecutorDryRun(config, origem, plano_contas, client=None), "offline (sem API)"
+
+    if not cred.completo:
+        raise SystemExit(
+            "Credenciais ausentes: preencha OMIE_APP_KEY/OMIE_APP_SECRET no .env "
+            "(veja .env.example) ou use --modo offline."
+        )
+
+    if modo == "apply":
+        client = OmieClient(cred, somente_leitura=False)
+        return ExecutorApply(config, origem, plano_contas, client=client), "apply (EXECUCAO/escrita)"
+
+    # dry-run (padrao): cliente read-only.
+    client = OmieClient(cred, somente_leitura=True)
+    return ExecutorDryRun(config, origem, plano_contas, client=client), "dry-run (leitura)"
+
+
 def processar(
     ofx_path: str,
     config_path: str,
     plano_contas_path: str = _PLANO_CONTAS_PADRAO,
-    usar_api: bool = True,
+    modo: str = "dry-run",
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     extrato = parse_ofx(ofx_path)
     motor = MotorDeRegras.de_arquivo(config_path)
     origem = motor.selecionar_origem(extrato)
     plano_contas = carregar_plano_contas(plano_contas_path)
 
-    # Cliente Omie read-only: so e criado se houver credenciais no .env e a
-    # consulta via API estiver habilitada. Sem isso, o debito cai no modo
-    # "payload proposto" (sem chamadas).
-    client = None
-    if usar_api:
-        cred = carregar_credenciais()
-        if cred.completo:
-            client = OmieClient(cred, somente_leitura=True)
-
-    executor = ExecutorDryRun(motor.config, origem, plano_contas, client=client)
+    executor, info_modo = _criar_executor(modo, motor.config, origem, plano_contas)
 
     registros: List[Dict[str, Any]] = []
     for t in extrato.transacoes:
@@ -101,6 +121,7 @@ def processar(
             }
         )
     resumo = gerar_resumo(registros)
+    resumo["modo"] = info_modo
     resumo["extrato"] = {
         "banco": extrato.bankid,
         "conta": extrato.acctid,
@@ -119,13 +140,32 @@ def main() -> None:
     ap.add_argument("--config", default=_CONFIG_PADRAO, help="Caminho do JSON de roteamento")
     ap.add_argument("--saida", default=_SAIDA_PADRAO, help="Pasta de saida dos relatorios")
     ap.add_argument(
-        "--sem-api",
+        "--modo",
+        choices=["dry-run", "apply", "offline"],
+        default="dry-run",
+        help=(
+            "dry-run (padrao): consulta a API (leitura), nao escreve. "
+            "apply: EXECUTA as escritas no Omie (requer --confirmar). "
+            "offline: nao consulta a API."
+        ),
+    )
+    ap.add_argument(
+        "--confirmar",
         action="store_true",
-        help="Nao consulta a API Omie (mesmo com .env): so registra o payload proposto.",
+        help="Obrigatorio no --modo apply: confirma a execucao de escritas no Omie.",
     )
     args = ap.parse_args()
 
-    registros, resumo = processar(args.ofx, args.config, usar_api=not args.sem_api)
+    # Salvaguarda: apply e um modo de ESCRITA em ambiente real. Exige confirmacao
+    # explicita para nao executar por acidente.
+    if args.modo == "apply" and not args.confirmar:
+        raise SystemExit(
+            "MODO APPLY exige confirmacao explicita. Este modo EXECUTA inclusoes "
+            "e baixas no Omie (escrita real). Reexecute com --confirmar se tem "
+            "certeza."
+        )
+
+    registros, resumo = processar(args.ofx, args.config, modo=args.modo)
 
     os.makedirs(args.saida, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -136,6 +176,7 @@ def main() -> None:
     escrever_json(json_path, registros, resumo)
 
     imprimir_resumo(resumo)
+    print(f"Modo: {resumo.get('modo')}")
     print(f"CSV : {csv_path}")
     print(f"JSON: {json_path}")
 

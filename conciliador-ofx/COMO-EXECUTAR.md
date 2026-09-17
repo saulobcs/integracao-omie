@@ -1,10 +1,13 @@
 # Como executar o conciliador (dry-run)
 
 Guia do que é necessário para rodar o fluxo de conciliação OFX → Omie. O
-conciliador roda em **dry-run**: lê um extrato OFX, aplica as regras de
-roteamento e gera um relatório (CSV + JSON) com as ações que **seriam**
-executadas no Omie. Ele **nunca** executa inclusão, baixa ou manutenção — apenas
-consulta (leitura) a API quando há credenciais.
+conciliador lê um extrato OFX, aplica as regras de roteamento e gera um
+relatório (CSV + JSON). Ele tem **dois modos** (ver seção 4):
+
+- **`dry-run`** (padrão): consulta a API (leitura), mas **nunca** executa
+  inclusão, baixa ou manutenção — as ações ficam como proposta no relatório. É o
+  modo para validar as regras de roteamento.
+- **`apply`**: modo de execução final, que **executa** as escritas no Omie.
 
 ---
 
@@ -51,22 +54,29 @@ OMIE_BASE=https://app.omie.com.br/api/v1
 
 ---
 
-## 3. Modelo de segurança (read-only)
+## 3. Modelo de segurança (por modo)
 
-Mesmo com credenciais válidas, o conciliador é **somente leitura**:
+O `OmieClient` tem duas allow-lists em `conciliador/omie_client.py`:
 
-- O `OmieClient` só aceita métodos de **consulta/pesquisa** (allow-list em
-  `conciliador/omie_client.py`): `PesquisarLancamentos`, `ConsultarCliente`,
+- **Leitura** (`METODOS_LEITURA`): `PesquisarLancamentos`, `ConsultarCliente`,
   `ListarClientes`, `ListarContasCorrentes`, `ListarCategorias`,
   `PesquisarTipoDocumento`, `ExtratoContaCorrente`, `ConsultaLancCC`,
   `ListarLancCC`.
-- Qualquer método de **escrita** (`IncluirLancCC`, `LancarPagamento`,
-  `Incluir*`, `Alterar*`, `Excluir*`) é **bloqueado antes de qualquer chamada de
-  rede**.
-- As baixas/inclusões aparecem no relatório apenas como propostas descritivas
-  (`baixa_proposta`, `IncluirLancCC` "apto a incluir"), nunca executadas.
+- **Escrita** (`METODOS_ESCRITA`): `IncluirLancCC`, `LancarPagamento`.
 
-Essa garantia é travada por testes automatizados (ver seção 6).
+O que cada modo pode fazer:
+
+- **`dry-run` / `offline`** — o cliente é **somente leitura**
+  (`somente_leitura=True`). Qualquer método de escrita é **bloqueado antes de
+  qualquer chamada de rede**. As inclusões/baixas aparecem no relatório apenas
+  como propostas descritivas (`baixa_proposta`, `IncluirLancCC` "apto a
+  incluir"), nunca executadas.
+- **`apply`** — o cliente é **read-write** (`somente_leitura=False`), o que
+  libera **apenas** os métodos de `METODOS_ESCRITA` (mapeados). Verbos não
+  mapeados (`Alterar*`, `Excluir*`, etc.) continuam bloqueados em qualquer modo.
+
+A garantia read-only do dry-run e a liberação controlada do apply são travadas
+por testes automatizados (ver seção 6).
 
 ---
 
@@ -92,12 +102,36 @@ python3 main.py \
 | `--ofx` | `../arquivos-referencia/Comprovante de Extrato.ofx` | Caminho do arquivo OFX a processar. |
 | `--config` | `config/roteamento.json` | Mapa de roteamento (origens e regras). |
 | `--saida` | `saida/` | Pasta onde os relatórios são gravados. |
-| `--sem-api` | (desligado) | Força o modo offline: **não** consulta a API, mesmo com `.env` preenchido. Útil para rodar rápido, sem rede. |
+| `--modo` | `dry-run` | Modo de execução: `dry-run`, `apply` ou `offline` (ver abaixo). |
+| `--confirmar` | (desligado) | **Obrigatório** no `--modo apply`. Confirma que você quer executar escritas reais no Omie. |
 
-> **Desempenho:** com credenciais, o crédito faz uma consulta `ConsultaLancCC`
-> por transação (checagem de idempotência) e o débito faz `PesquisarLancamentos`
-> + `ConsultarCliente`. Em extratos grandes isso deixa a execução mais lenta. Use
-> `--sem-api` quando só quiser ver o roteamento.
+### Modos de execução
+
+| Modo | API | Escreve no Omie? | Uso |
+|------|-----|------------------|-----|
+| `dry-run` (padrão) | consulta (leitura) | **Não** | Validar as regras de roteamento com dados reais (idempotência de crédito e matching de débito), sem risco. |
+| `offline` | nenhuma | **Não** | Ver só o roteamento, sem rede. Não exige `.env`. |
+| `apply` | leitura + **escrita** | **Sim** | Execução final: inclui lançamentos (`IncluirLancCC`) e baixa títulos (`LancarPagamento`). |
+
+```bash
+# dry-run (padrão): consulta, não escreve
+python3 main.py --ofx "../arquivos-referencia/Stone.ofx"
+
+# offline: sem nenhuma chamada à API
+python3 main.py --ofx "../arquivos-referencia/Stone.ofx" --modo offline
+
+# apply: EXECUÇÃO REAL (exige --confirmar)
+python3 main.py --ofx "../arquivos-referencia/Stone.ofx" --modo apply --confirmar
+```
+
+> **`apply` é escrita real.** Sem `--confirmar`, o programa aborta com aviso. O
+> modo respeita idempotência: um crédito que já existe no Omie (mesmo
+> `cCodIntLanc`) **não** é reincluído.
+
+> **Desempenho:** com API (dry-run ou apply), o crédito faz uma consulta
+> `ConsultaLancCC` por transação (idempotência) e o débito faz
+> `PesquisarLancamentos` + `ConsultarCliente`. Em extratos grandes isso deixa a
+> execução mais lenta. Use `--modo offline` quando só quiser ver o roteamento.
 
 ---
 
@@ -116,17 +150,22 @@ rota (crédito roteado / baixa de conta a pagar / manual) e por regra.
 
 ---
 
-## 6. Testes (garantia read-only)
-
-Para confirmar que nenhum serviço de escrita é chamado:
+## 6. Testes
 
 ```bash
 cd conciliador-ofx
 python3 -m unittest discover -s tests -v
 ```
 
-Os testes provam que a allow-list não contém métodos de escrita, que a escrita é
-bloqueada antes da rede, e que um dry-run completo só emite chamadas de leitura.
+Os testes cobrem:
+
+- **Garantia read-only do dry-run** (`test_dry_run_read_only.py`): no modo
+  somente leitura a escrita é bloqueada antes da rede e um dry-run completo só
+  emite chamadas de leitura; no modo read-write só os métodos de escrita
+  mapeados são liberados.
+- **Modo apply** (`test_executor_apply.py`): o `ExecutorApply` exige cliente
+  read-write, executa a inclusão quando o crédito não existe e **não** reinclui
+  quando já existe (idempotência); o `ExecutorDryRun` nunca executa escrita.
 
 ---
 

@@ -3,11 +3,14 @@
 A API Omie e um POST JSON por endpoint, com `call`, `app_key`, `app_secret` e
 `param` (array de 1 objeto). Nao ha endpoint de auth separado.
 
-SEGURANCA (dry-run): este cliente e "read-only por padrao". Apenas metodos de
-CONSULTA/PESQUISA estao na allow-list `METODOS_LEITURA`. Qualquer `call` fora
-dela e recusado com `OmieMetodoBloqueado` -- garante que o dry-run nunca escreve
-(nunca baixa titulo, nunca inclui lancamento). Para habilitar escrita, seria
-preciso um cliente/config explicito fora do dry-run.
+SEGURANCA: por padrao (`somente_leitura=True`) o cliente e read-only -- apenas
+metodos de CONSULTA/PESQUISA (`METODOS_LEITURA`) sao permitidos; qualquer outro
+`call` e recusado com `OmieMetodoBloqueado`. Isso garante que o modo dry-run
+nunca escreve (nunca baixa titulo, nunca inclui lancamento).
+
+O modo de EXECUCAO final usa `somente_leitura=False`, o que habilita tambem os
+metodos de `METODOS_ESCRITA` (inclusao/baixa). Metodos que nao estejam em
+NENHUMA das duas listas continuam recusados (nao ha URL mapeada).
 """
 
 from __future__ import annotations
@@ -31,6 +34,13 @@ METODOS_LEITURA: Dict[str, str] = {
     "ExtratoContaCorrente": "financas/extrato/",
     "ConsultaLancCC": "financas/contacorrentelancamentos/",
     "ListarLancCC": "financas/contacorrentelancamentos/",
+}
+
+# Metodos de ESCRITA (inclusao/baixa) usados no modo de execucao final.
+# So sao aceitos por um cliente com somente_leitura=False (ExecutorApply).
+METODOS_ESCRITA: Dict[str, str] = {
+    "IncluirLancCC": "financas/contacorrentelancamentos/",
+    "LancarPagamento": "financas/contapagar/",
 }
 
 
@@ -67,13 +77,16 @@ class OmieClient:
         self.timeout = timeout
 
     def _endpoint(self, call: str) -> str:
+        # Um metodo de escrita so tem sua URL resolvida quando o cliente NAO e
+        # somente-leitura. Assim, mesmo que o codigo tente montar a URL de uma
+        # escrita no modo dry-run, o _endpoint recusa.
         recurso = METODOS_LEITURA.get(call)
+        if recurso is None and not self.somente_leitura:
+            recurso = METODOS_ESCRITA.get(call)
         if recurso is None:
-            # Fora da allow-list: so permitido se somente_leitura=False (nao e o
-            # caso do dry-run). Sem recurso mapeado, nao sabemos a URL de qq forma.
             raise OmieMetodoBloqueado(
-                f"Metodo '{call}' nao esta na allow-list de leitura. "
-                f"No dry-run apenas consultas/pesquisas sao permitidas."
+                f"Metodo '{call}' nao permitido "
+                f"({'somente-leitura' if self.somente_leitura else 'sem URL mapeada'})."
             )
         base = self.cred.base.rstrip("/")
         return f"{base}/{recurso}"
@@ -89,6 +102,11 @@ class OmieClient:
         if self.somente_leitura and call not in METODOS_LEITURA:
             raise OmieMetodoBloqueado(
                 f"Metodo '{call}' bloqueado: cliente em modo somente-leitura."
+            )
+        # Fora do modo read-only, so aceita metodos conhecidos (leitura ou escrita).
+        if not self.somente_leitura and call not in METODOS_LEITURA and call not in METODOS_ESCRITA:
+            raise OmieMetodoBloqueado(
+                f"Metodo '{call}' desconhecido (nao esta em leitura nem escrita)."
             )
         if not self.cred.completo:
             raise OmieError(

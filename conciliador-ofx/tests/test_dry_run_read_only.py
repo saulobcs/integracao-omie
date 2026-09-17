@@ -110,17 +110,28 @@ class TestClienteBloqueiaEscrita(unittest.TestCase):
         # atingida porque o bloqueio ocorre antes.
         self.cli = OmieClient(Credenciais(app_key="k", app_secret="s"), somente_leitura=True)
 
-    def test_escrita_bloqueada_antes_da_rede(self):
-        """Qualquer metodo de escrita levanta OmieMetodoBloqueado (sem rede)."""
+    def test_escrita_bloqueada_no_modo_read_only(self):
+        """No modo read-only (dry-run), qualquer metodo de escrita e bloqueado."""
         for metodo in METODOS_ESCRITA:
             with self.assertRaises(OmieMetodoBloqueado, msg=f"{metodo} deveria ser bloqueado"):
                 self.cli.chamar(metodo, {})
 
-    def test_endpoint_de_escrita_tambem_bloqueia(self):
-        """Mesmo com somente_leitura=False, _endpoint nao resolve URL de escrita."""
+    def test_read_write_so_libera_escrita_mapeada(self):
+        """No modo read-write (apply), so os metodos de escrita MAPEADOS resolvem.
+
+        IncluirLancCC/LancarPagamento resolvem URL; verbos de escrita fora do
+        mapa (ExcluirLancCC, AlterarCliente, etc.) continuam bloqueados.
+        """
+        from conciliador.omie_client import METODOS_ESCRITA as ESCRITA_MAPEADA
+
         cli = OmieClient(Credenciais(app_key="k", app_secret="s"), somente_leitura=False)
-        for metodo in METODOS_ESCRITA:
-            with self.assertRaises(OmieMetodoBloqueado):
+        # Mapeados: resolvem (nao lancam).
+        for metodo in ESCRITA_MAPEADA:
+            self.assertTrue(cli._endpoint(metodo).startswith("http"))
+        # Nao mapeados: continuam bloqueados mesmo em read-write.
+        nao_mapeados = [m for m in METODOS_ESCRITA if m not in ESCRITA_MAPEADA]
+        for metodo in nao_mapeados:
+            with self.assertRaises(OmieMetodoBloqueado, msg=f"{metodo} deveria ser bloqueado"):
                 cli._endpoint(metodo)
 
 

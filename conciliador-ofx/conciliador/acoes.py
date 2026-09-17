@@ -1,12 +1,17 @@
-"""Camada de acao plugavel.
+"""Camada de acao plugavel -- dois executores.
 
-Isola o ponto onde a integracao com o Omie aconteceria. Hoje existe apenas a
-implementacao DRY-RUN, que monta o payload que SERIA enviado e o registra, sem
-chamar a API (ainda nao ha app_key/app_secret).
+A DECISAO (o que fazer: qual conta destino, cCodIntLanc, matching de debito,
+idempotencia) fica na classe base `ExecutorAcao._decidir`, compartilhada. Sobre
+essa decisao, dois executores concretos:
 
-Quando as credenciais existirem, basta criar uma implementacao `OmieReal` que
-herde de `ExecutorAcao` e faca o POST usando o mesmo payload -- o restante do
-fluxo (parser, regras, relatorio) nao muda.
+- `ExecutorDryRun`: NAO escreve. Consulta a API (leitura) para idempotencia e
+  matching de debito, mas as acoes de escrita ficam apenas como "proposta" no
+  relatorio. E o modo de validacao das regras de roteamento.
+
+- `ExecutorApply`: modo de EXECUCAO final. Reusa a mesma decisao e, ao final,
+  EXECUTA as escritas (IncluirLancCC / LancarPagamento) via um OmieClient com
+  somente_leitura=False. Respeita idempotencia (nao inclui credito que ja
+  existe) e so age em decisoes conclusivas.
 """
 
 from __future__ import annotations
@@ -90,15 +95,14 @@ def _fmt_conta(
 
 
 class ExecutorAcao(ABC):
-    """Contrato de execucao de uma decisao de roteamento."""
+    """Contrato + decisao compartilhada entre os executores.
 
-    @abstractmethod
-    def executar(self, decisao: Decisao) -> Dict[str, Any]:
-        """Retorna um registro descrevendo o que foi (ou seria) feito."""
-
-
-class ExecutorDryRun(ExecutorAcao):
-    """Nao chama a API: monta o payload proposto e marca como simulado."""
+    `_decidir` produz o registro (base dict) com todos os dados da acao, inc
+    luindo -- quando ha escrita a fazer -- um `_plano_escrita` (call, endpoint,
+    param) que o executor concreto decide se descreve (dry-run) ou executa
+    (apply). A decisao usa o cliente APENAS para leitura (idempotencia e
+    matching de debito), valida em ambos os modos.
+    """
 
     def __init__(
         self,
@@ -111,13 +115,10 @@ class ExecutorDryRun(ExecutorAcao):
         self.origem = origem or {}
         # Mapa nCodCC -> descricao (do contas-haru.json), para exibir '(nCodCC) descricao'.
         self.plano_contas = plano_contas or {}
-        # Cliente Omie read-only (opcional). Se presente, o debito e casado
-        # consultando a API (PesquisarLancamentos + ConsultarCliente). Sem
-        # cliente, apenas o payload proposto e registrado.
+        # Cliente Omie. No dry-run e read-only; no apply e read-write. A DECISAO
+        # so usa metodos de leitura (idempotencia/matching), validos em ambos.
         self.client = client
-        # nCodCC da conta de origem selecionada (pode ser None enquanto pendente P1).
         self.ncodcc_origem = self.origem.get("ncodcc_omie")
-        # Conta de origem ja formatada como '(nCodCC) descricao'.
         self.conta_origem = _fmt_conta(
             self.ncodcc_origem,
             self.plano_contas,
@@ -125,9 +126,19 @@ class ExecutorDryRun(ExecutorAcao):
             nome_fallback=self.origem.get("nome"),
         )
 
+    @abstractmethod
     def executar(self, decisao: Decisao) -> Dict[str, Any]:
+        """Retorna um registro descrevendo o que foi (ou seria) feito."""
+
+    def _decidir(self, decisao: Decisao) -> Dict[str, Any]:
+        """Monta o registro da decisao (comum a dry-run e apply).
+
+        Quando ha uma escrita a realizar, anexa `base['_plano_escrita']` com
+        `{call, endpoint, param}`. Rotas sem escrita (manual, pendentes, credito
+        ja existente) nao anexam plano.
+        """
         t = decisao.transacao
-        base = {
+        base: Dict[str, Any] = {
             "fitid": t.fitid,
             "rota": decisao.rota,
             "regra": decisao.regra,
@@ -139,137 +150,215 @@ class ExecutorDryRun(ExecutorAcao):
             "endpoint": None,
             "call": None,
             "motivo": decisao.motivo,
+            "_plano_escrita": None,
         }
 
         if decisao.rota == "credito_roteado" and decisao.acao == "incluir_lanc_cc":
-            base["conta_destino"] = _fmt_conta(
-                decisao.ncodcc_destino,
-                self.plano_contas,
-                descricao_config=decisao.descricao_destino,
-            )
-            base["endpoint"] = "/api/v1/financas/contacorrentelancamentos/"
-            base["call"] = "IncluirLancCC"
-            # cCodIntLanc: <=20 chars derivado do FITID (hash deterministico se o
-            # FITID exceder 20). fitid_origem preservado p/ rastreio.
-            ccodintlanc = _derivar_ccodintlanc(t.fitid)
-            base["payload_proposto"] = {
-                "cabecalho": {
-                    "nCodCC": decisao.ncodcc_destino,  # placeholder (pendencia P1)
-                    "dDtLanc": _fmt_data(t),
-                    "nValorLanc": float(t.valor),
-                },
-                "detalhes": {
-                    "cCodCateg": decisao.ccodcateg,  # placeholder (pendencia P1)
-                    "cTipo": "PIX",
-                },
-                "cCodIntLanc": ccodintlanc,
-                "fitid_origem": t.fitid,
-            }
-
-            # Idempotencia: antes de incluir, consulta se ja existe um lancamento
-            # com esse cCodIntLanc. Se existir, NAO inclui e registra "ja existe".
-            if self.client is not None and ccodintlanc:
-                ncod_existente = _consultar_lancamento_existente(self.client, ccodintlanc)
-                if ncod_existente is not None:
-                    base["call"] = "ConsultaLancCC (ja existe)"
-                    base["motivo"] = (
-                        f"Lancamento ja existe (nCodLanc {ncod_existente}) para "
-                        f"cCodIntLanc {ccodintlanc}. Nao incluido."
-                    )
-                    base["payload_proposto"]["idempotencia"] = {
-                        "ja_existe": True,
-                        "nCodLanc": ncod_existente,
-                        "cCodIntLanc": ccodintlanc,
-                        "consulta": "ConsultaLancCC",
-                    }
-                else:
-                    base["payload_proposto"]["idempotencia"] = {
-                        "ja_existe": False,
-                        "cCodIntLanc": ccodintlanc,
-                        "consulta": "ConsultaLancCC",
-                        "nota": "Nao existe -> apto a incluir (IncluirLancCC nao executado no dry-run).",
-                    }
-
+            self._decidir_credito(decisao, base)
         elif decisao.rota == "baixa_conta_pagar":
-            base["endpoint"] = "/api/v1/financas/pesquisartitulos/"
-            base["call"] = "PesquisarLancamentos -> ConsultarCliente"
-            if self.client is not None:
-                # Executa o matching real (read-only): pesquisa titulos em aberto,
-                # casa por valor exato e testa nome_fantasia no memo.
-                match = casar_debito(self.client, Decimal(str(t.valor)), t.memo)
-                base["payload_proposto"] = {
-                    "match_status": match.status,
-                    "ncod_titulo": match.ncod_titulo,
-                    "ncod_cliente": match.ncod_cliente,
-                    "nome_fantasia": match.nome_fantasia,
-                    "razao_social": match.razao_social,
-                    "valor_titulo": match.valor_titulo,
-                    "candidatos_valor_exato": match.candidatos_valor_exato,
-                    "trilha": match.trilha,
-                }
-                base["motivo"] = match.motivo
-                if match.status == "casado":
-                    # Titulo identificado: a baixa (escrita) fica fora do dry-run.
-                    base["conta_destino"] = f"titulo {match.ncod_titulo} ({match.razao_social})"
-                    base["payload_proposto"]["baixa_proposta"] = {
-                        "endpoint": "/api/v1/financas/contapagar/",
-                        "call": "LancarPagamento",
-                        "codigo_lancamento": match.ncod_titulo,
-                        "valor": abs(float(t.valor)),
-                        "data": _fmt_data(t),
-                        "observacao": f"Conciliacao OFX - FITID {t.fitid}",
-                        "nota": "NAO executado no dry-run (metodo de escrita).",
-                    }
-                else:
-                    # manual/erro: nao ha titulo unico casado -> revisao humana.
-                    base["rota"] = "manual" if match.status == "manual" else base["rota"]
-            else:
-                # Sem cliente/credenciais: apenas descreve o que seria feito.
-                data = _fmt_data(t)
-                base["payload_proposto"] = {
-                    "busca_titulo": {
-                        "call": "PesquisarLancamentos",
-                        "param": [
-                            {
-                                "nPagina": 1,
-                                "nRegPorPagina": 100,
-                                "cNatureza": "P",
-                                "cStatus": "EMABERTO",
-                                "dDtVencDe": "<hoje-5d>",
-                                "dDtVencAte": "<hoje+5d>",
-                            }
-                        ],
-                    },
-                    "match_valor_client_side": abs(float(t.valor)),
-                    "memo_ofx": t.memo,
-                    "observacao": (
-                        "Sem credenciais (.env): matching nao executado. Com .env, "
-                        "casa por valor exato (nValorTitulo) + nome_fantasia "
-                        "(ConsultarCliente) contido no memo."
-                    ),
-                }
-
+            self._decidir_debito(decisao, base)
         elif decisao.rota == "pendente_debito":
             base["conta_destino"] = _fmt_conta(
                 decisao.ncodcc_destino,
                 self.plano_contas,
                 descricao_config=decisao.descricao_destino,
             )
-            base["endpoint"] = None
-            base["call"] = None
             base["payload_proposto"] = {
                 "contexto": "Debito Stone - tratativa a validar (baixa de conta a pagar vs. lancamento em Stone - Cartão de Débito).",
                 "conta_debito_sugerida": base["conta_destino"],
                 "valor": abs(float(t.valor)),
                 "memo": t.memo,
             }
-
         elif decisao.rota == "pendente_p4":
-            base["endpoint"] = None
-            base["call"] = None
             base["payload_proposto"] = {
                 "contexto": "Debito Pix (freelancer/motoboy) - tratativa a definir (P4).",
             }
-
         # rota 'manual' fica sem payload: requer intervencao humana.
+        return base
+
+    def _decidir_credito(self, decisao: Decisao, base: Dict[str, Any]) -> None:
+        t = decisao.transacao
+        base["conta_destino"] = _fmt_conta(
+            decisao.ncodcc_destino,
+            self.plano_contas,
+            descricao_config=decisao.descricao_destino,
+        )
+        base["endpoint"] = "/api/v1/financas/contacorrentelancamentos/"
+        base["call"] = "IncluirLancCC"
+        # cCodIntLanc: <=20 chars derivado do FITID (hash deterministico se >20).
+        ccodintlanc = _derivar_ccodintlanc(t.fitid)
+        payload = {
+            "cCodIntLanc": ccodintlanc,
+            "cabecalho": {
+                "nCodCC": decisao.ncodcc_destino,  # placeholder (pendencia P1)
+                "dDtLanc": _fmt_data(t),
+                "nValorLanc": float(t.valor),
+            },
+            "detalhes": {
+                "cCodCateg": decisao.ccodcateg,  # placeholder (pendencia P1)
+                "cTipo": "PIX",
+            },
+        }
+        base["payload_proposto"] = {**payload, "fitid_origem": t.fitid}
+
+        # Idempotencia: consulta se ja existe lancamento com esse cCodIntLanc.
+        if self.client is not None and ccodintlanc:
+            ncod_existente = _consultar_lancamento_existente(self.client, ccodintlanc)
+            if ncod_existente is not None:
+                base["call"] = "ConsultaLancCC (ja existe)"
+                base["motivo"] = (
+                    f"Lancamento ja existe (nCodLanc {ncod_existente}) para "
+                    f"cCodIntLanc {ccodintlanc}. Nao incluido."
+                )
+                base["payload_proposto"]["idempotencia"] = {
+                    "ja_existe": True,
+                    "nCodLanc": ncod_existente,
+                    "cCodIntLanc": ccodintlanc,
+                    "consulta": "ConsultaLancCC",
+                }
+                return  # ja existe -> sem plano de escrita
+            base["payload_proposto"]["idempotencia"] = {
+                "ja_existe": False,
+                "cCodIntLanc": ccodintlanc,
+                "consulta": "ConsultaLancCC",
+            }
+
+        # Ha inclusao a fazer -> registra o plano de escrita.
+        base["_plano_escrita"] = {
+            "call": "IncluirLancCC",
+            "endpoint": "/api/v1/financas/contacorrentelancamentos/",
+            "param": payload,
+        }
+
+    def _decidir_debito(self, decisao: Decisao, base: Dict[str, Any]) -> None:
+        t = decisao.transacao
+        base["endpoint"] = "/api/v1/financas/pesquisartitulos/"
+        base["call"] = "PesquisarLancamentos -> ConsultarCliente"
+        if self.client is None:
+            # Sem cliente: apenas descreve o que seria feito.
+            base["payload_proposto"] = {
+                "busca_titulo": {
+                    "call": "PesquisarLancamentos",
+                    "param": [
+                        {
+                            "nPagina": 1,
+                            "nRegPorPagina": 100,
+                            "cNatureza": "P",
+                            "cStatus": "EMABERTO",
+                            "dDtVencDe": "<hoje-5d>",
+                            "dDtVencAte": "<hoje+5d>",
+                        }
+                    ],
+                },
+                "match_valor_client_side": abs(float(t.valor)),
+                "memo_ofx": t.memo,
+                "observacao": (
+                    "Sem credenciais (.env): matching nao executado. Com .env, "
+                    "casa por valor exato (nValorTitulo) + nome_fantasia "
+                    "(ConsultarCliente) contido no memo."
+                ),
+            }
+            return
+
+        # Matching real (leitura): pesquisa, casa por valor exato + nome_fantasia.
+        match = casar_debito(self.client, Decimal(str(t.valor)), t.memo)
+        base["payload_proposto"] = {
+            "match_status": match.status,
+            "ncod_titulo": match.ncod_titulo,
+            "ncod_cliente": match.ncod_cliente,
+            "nome_fantasia": match.nome_fantasia,
+            "razao_social": match.razao_social,
+            "valor_titulo": match.valor_titulo,
+            "candidatos_valor_exato": match.candidatos_valor_exato,
+            "trilha": match.trilha,
+        }
+        base["motivo"] = match.motivo
+        if match.status == "casado":
+            base["conta_destino"] = f"titulo {match.ncod_titulo} ({match.razao_social})"
+            baixa = {
+                "codigo_lancamento": match.ncod_titulo,
+                "valor": abs(float(t.valor)),
+                "data": _fmt_data(t),
+                "observacao": f"Conciliacao OFX - FITID {t.fitid}",
+            }
+            base["payload_proposto"]["baixa_proposta"] = {
+                "endpoint": "/api/v1/financas/contapagar/",
+                "call": "LancarPagamento",
+                **baixa,
+            }
+            base["_plano_escrita"] = {
+                "call": "LancarPagamento",
+                "endpoint": "/api/v1/financas/contapagar/",
+                "param": baixa,
+            }
+        else:
+            # manual/erro: nao ha titulo unico casado -> revisao humana.
+            base["rota"] = "manual" if match.status == "manual" else base["rota"]
+
+
+class ExecutorDryRun(ExecutorAcao):
+    """Nao escreve: monta a decisao e marca a escrita como apenas proposta."""
+
+    def executar(self, decisao: Decisao) -> Dict[str, Any]:
+        base = self._decidir(decisao)
+        plano = base.pop("_plano_escrita", None)
+        base["simulado"] = True
+        if plano is not None:
+            # Marca a proposta como nao executada (o payload ja esta em payload_proposto).
+            pp = base.get("payload_proposto")
+            if isinstance(pp, dict):
+                if "baixa_proposta" in pp and isinstance(pp["baixa_proposta"], dict):
+                    pp["baixa_proposta"]["nota"] = "NAO executado no dry-run (metodo de escrita)."
+                elif "idempotencia" in pp and isinstance(pp["idempotencia"], dict):
+                    pp["idempotencia"]["nota"] = (
+                        "Nao existe -> apto a incluir (IncluirLancCC nao executado no dry-run)."
+                    )
+        return base
+
+
+class ExecutorApply(ExecutorAcao):
+    """Modo de EXECUCAO final: reusa a decisao e EXECUTA as escritas.
+
+    Requer um OmieClient com somente_leitura=False. Para cada decisao com
+    `_plano_escrita`, dispara o `call` (IncluirLancCC / LancarPagamento) e
+    registra o resultado (nCodLanc / codigo_baixa) ou o erro. Decisoes sem
+    plano (manual, pendentes, credito ja existente) nao geram escrita.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.client is None:
+            raise ValueError("ExecutorApply requer um OmieClient (com credenciais).")
+        if getattr(self.client, "somente_leitura", True):
+            raise ValueError(
+                "ExecutorApply requer OmieClient com somente_leitura=False."
+            )
+
+    def executar(self, decisao: Decisao) -> Dict[str, Any]:
+        from .omie_client import OmieError
+
+        base = self._decidir(decisao)
+        plano = base.pop("_plano_escrita", None)
+        base["simulado"] = False
+        if plano is None:
+            base["executado"] = False
+            return base
+
+        try:
+            resp = self.client.chamar(plano["call"], plano["param"])
+            base["executado"] = True
+            base["resultado_execucao"] = {
+                "call": plano["call"],
+                "nCodLanc": resp.get("nCodLanc"),
+                "cCodIntLanc": resp.get("cCodIntLanc"),
+                "codigo_lancamento": resp.get("codigo_lancamento"),
+                "codigo_baixa": resp.get("codigo_baixa"),
+                "cCodStatus": resp.get("cCodStatus"),
+                "cDesStatus": resp.get("cDesStatus"),
+            }
+            base["motivo"] = f"Executado {plano['call']} com sucesso."
+        except OmieError as exc:
+            base["executado"] = False
+            base["erro_execucao"] = str(exc)
+            base["motivo"] = f"Falha ao executar {plano['call']}: {exc}"
         return base
