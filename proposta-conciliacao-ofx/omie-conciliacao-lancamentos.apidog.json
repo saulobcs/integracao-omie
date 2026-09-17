@@ -1,0 +1,162 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Omie - Conciliacao OFX (Lancamentos em conta corrente / consulta)",
+    "version": "1.0.0",
+    "description": "Consulta de lancamentos em conta corrente criados pelo IncluirLancCC. Serve para verificar um lancamento pelo nCodLanc (retornado na inclusao) ou pelo cCodIntLanc (nosso codigo derivado do FITID) -- util para checar idempotencia antes de reincluir.\n\nEndpoint: /financas/contacorrentelancamentos/. Metodos de LEITURA: ConsultaLancCC (por chave) e ListarLancCC (paginado por data). Metodos de escrita do mesmo endpoint (IncluirLancCC/AlterarLancCC/ExcluirLancCC) NAO estao aqui.\n\nAtencao ao nome: e ConsultaLancCC (sem 'r'), confirmado pelo WSDL /financas/contacorrentelancamentos/?WSDL (tipos lanccConsultarRequest/lanccConsultarResponse).\n\nAutenticacao: credenciais app_key/app_secret no corpo (nao ha endpoint de auth). Use {{OMIE_APP_KEY}} e {{OMIE_APP_SECRET}}. Sempre inspecione o corpo: erros de negocio vem com faultstring/faultcode."
+  },
+  "servers": [
+    {
+      "url": "{{OMIE_BASE}}",
+      "description": "Base da API Omie",
+      "variables": {
+        "OMIE_BASE": {
+          "default": "https://app.omie.com.br/api/v1"
+        }
+      }
+    }
+  ],
+  "tags": [
+    { "name": "Lancamentos", "description": "Consulta de lancamentos em conta corrente (leitura)" }
+  ],
+  "paths": {
+    "/financas/contacorrentelancamentos/": {
+      "post": {
+        "tags": ["Lancamentos"],
+        "summary": "ConsultaLancCC / ListarLancCC - consultar lancamento",
+        "operationId": "consultaLancCC",
+        "description": "Duas formas de consulta (somente leitura):\n\n1) ConsultaLancCC (por chave): informe nCodLanc (codigo do lancamento) OU cCodIntLanc (codigo de integracao). Retorna o lancamento completo (cabecalho, detalhes, transferencia, diversos, info).\n\n2) ListarLancCC (paginado): lista lancamentos por janela de data (dDtIncDe/dDtIncAte etc.). Exemplo alternativo abaixo.\n\nO example padrao usa ConsultaLancCC por nCodLanc.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call": { "type": "string", "description": "ConsultaLancCC | ListarLancCC", "example": "ConsultaLancCC" },
+                  "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
+                  "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
+                  "param": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "nCodLanc": { "type": "integer", "description": "ConsultaLancCC: codigo do lancamento (do IncluirLancCC)", "example": 987654321 },
+                        "cCodIntLanc": { "type": "string", "maxLength": 20, "description": "ConsultaLancCC: alternativa por codigo de integracao (derivado do FITID)", "example": "0dcddb740e4fa4fd76c3" }
+                      }
+                    }
+                  }
+                }
+              },
+              "examples": {
+                "ConsultaLancCC_por_nCodLanc": {
+                  "summary": "ConsultaLancCC pelo nCodLanc",
+                  "value": {
+                    "call": "ConsultaLancCC",
+                    "app_key": "{{OMIE_APP_KEY}}",
+                    "app_secret": "{{OMIE_APP_SECRET}}",
+                    "param": [
+                      {
+                        "nCodLanc": 987654321
+                      }
+                    ]
+                  }
+                },
+                "ConsultaLancCC_por_cCodIntLanc": {
+                  "summary": "ConsultaLancCC pelo cCodIntLanc (checagem de idempotencia)",
+                  "value": {
+                    "call": "ConsultaLancCC",
+                    "app_key": "{{OMIE_APP_KEY}}",
+                    "app_secret": "{{OMIE_APP_SECRET}}",
+                    "param": [
+                      {
+                        "cCodIntLanc": "0dcddb740e4fa4fd76c3"
+                      }
+                    ]
+                  }
+                },
+                "ListarLancCC_por_data": {
+                  "summary": "ListarLancCC paginado por janela de inclusao",
+                  "value": {
+                    "call": "ListarLancCC",
+                    "app_key": "{{OMIE_APP_KEY}}",
+                    "app_secret": "{{OMIE_APP_SECRET}}",
+                    "param": [
+                      {
+                        "nPagina": 1,
+                        "nRegPorPagina": 50,
+                        "dDtIncDe": "01/09/2026",
+                        "dDtIncAte": "30/09/2026"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lancamento (ConsultaLancCC) ou lista (ListarLancCC)",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "ConsultaLancCC": {
+                    "summary": "Resposta do ConsultaLancCC",
+                    "value": {
+                      "nCodLanc": 987654321,
+                      "cCodIntLanc": "0dcddb740e4fa4fd76c3",
+                      "nCodAgrup": 0,
+                      "cabecalho": {
+                        "nCodCC": 9064882272,
+                        "dDtLanc": "01/09/2026",
+                        "nValorLanc": 143.73
+                      },
+                      "detalhes": {
+                        "cCodCateg": "1.01.01",
+                        "cTipo": "PIX",
+                        "nCodCliente": 0,
+                        "cObs": "Conciliacao OFX"
+                      },
+                      "diversos": {
+                        "cOrigem": "API",
+                        "cNatureza": "R"
+                      },
+                      "info": {
+                        "dInc": "01/09/2026",
+                        "cImpAPI": "S"
+                      }
+                    }
+                  },
+                  "ListarLancCC": {
+                    "summary": "Resposta do ListarLancCC",
+                    "value": {
+                      "nPagina": 1,
+                      "nTotPaginas": 1,
+                      "nRegistros": 1,
+                      "nTotRegistros": 1,
+                      "listaLancamentos": [
+                        {
+                          "nCodLanc": 987654321,
+                          "cCodIntLanc": "0dcddb740e4fa4fd76c3",
+                          "cabecalho": {
+                            "nCodCC": 9064882272,
+                            "dDtLanc": "01/09/2026",
+                            "nValorLanc": 143.73
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {}
+  }
+}

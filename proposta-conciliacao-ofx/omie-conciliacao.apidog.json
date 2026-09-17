@@ -1,0 +1,390 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Omie - Conciliacao OFX",
+    "version": "1.0.0",
+    "description": "Colecao das chamadas da API Omie usadas no processo de conciliacao OFX -> Omie.\n\nAutenticacao: a Omie NAO possui endpoint de auth separado. As credenciais app_key/app_secret vao no corpo de cada chamada. Use as variaveis de ambiente do Apidog: {{OMIE_APP_KEY}} e {{OMIE_APP_SECRET}}.\n\nSempre inspecione o corpo da resposta: a Omie pode retornar erro de negocio com faultstring/faultcode mesmo em HTTP != 200."
+  },
+  "servers": [
+    {
+      "url": "{{OMIE_BASE}}",
+      "description": "Base da API Omie",
+      "variables": {
+        "OMIE_BASE": {
+          "default": "https://app.omie.com.br/api/v1"
+        }
+      }
+    }
+  ],
+  "tags": [
+    { "name": "Autenticacao", "description": "Validacao de credenciais (nao ha endpoint de auth dedicado)" },
+    { "name": "Setup", "description": "Descoberta de contas correntes (nCodCC)" },
+    { "name": "Credito", "description": "Lancamento de credito roteado" },
+    { "name": "Debito", "description": "Busca e baixa de titulos a pagar" },
+    { "name": "Conferencia", "description": "Leitura de extrato para conferencia de saldo" }
+  ],
+  "paths": {
+    "/geral/contacorrente/": {
+      "post": {
+        "tags": ["Setup"],
+        "summary": "ListarContasCorrentes / Validar credenciais",
+        "operationId": "listarContasCorrentes",
+        "description": "Lista as contas correntes para descobrir os nCodCC (pendencia P1). Tambem serve como teste de credenciais: use registros_por_pagina=1 para uma chamada leve.\n\nCredencial invalida -> corpo com faultstring (ex.: '... not authorized.').",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call": { "type": "string", "example": "ListarContasCorrentes" },
+                  "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
+                  "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
+                  "param": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "pagina": { "type": "integer", "description": "Pagina (inicia em 1)", "example": 1 },
+                        "registros_por_pagina": { "type": "integer", "description": "<= 100 recomendado (use 1 para so validar credenciais)", "example": 100 },
+                        "apenas_importado_api": { "type": "string", "description": "S / N", "example": "N" }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "call": "ListarContasCorrentes",
+                "app_key": "{{OMIE_APP_KEY}}",
+                "app_secret": "{{OMIE_APP_SECRET}}",
+                "param": [
+                  {
+                    "pagina": 1,
+                    "registros_por_pagina": 100,
+                    "apenas_importado_api": "N"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lista de contas correntes",
+            "content": {
+              "application/json": {
+                "example": {
+                  "pagina": 1,
+                  "total_de_paginas": 1,
+                  "ListarContasCorrentes": [
+                    {
+                      "nCodCC": 123456789,
+                      "cCodCCInt": "STONE-01",
+                      "tipo_conta_corrente": "CC",
+                      "codigo_banco": "197",
+                      "descricao": "Conta Stone",
+                      "numero_conta_corrente": "6684788-0",
+                      "inativo": "N"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/financas/contacorrentelancamentos/": {
+      "post": {
+        "tags": ["Credito"],
+        "summary": "IncluirLancCC - lancar credito roteado",
+        "operationId": "incluirLancCC",
+        "description": "Lanca um credito na conta destino mapeada (rota credito_roteado).\n\ncCodIntLanc e string(20) obrigatoria (ancora de idempotencia). O FITID da Stone e UUID(36) e NAO cabe: e derivado via hash deterministico (20 primeiros hex de sha256(fitid)) - P3.1 RESOLVIDA, implementado em acoes.py::_derivar_ccodintlanc.\n\nPara transferencia entre contas, inclua o bloco transferencia.nCodCCDestino.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call": { "type": "string", "example": "IncluirLancCC" },
+                  "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
+                  "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
+                  "param": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "cCodIntLanc": { "type": "string", "maxLength": 20, "description": "Codigo de integracao do lancamento (hash 20 chars do FITID)", "example": "a1b2c3d4e5f60718293a" },
+                        "cabecalho": {
+                          "type": "object",
+                          "properties": {
+                            "nCodCC": { "type": "integer", "description": "Conta destino (do ListarContasCorrentes)", "example": 123456789 },
+                            "dDtLanc": { "type": "string", "description": "Data dd/mm/aaaa", "example": "27/08/2026" },
+                            "nValorLanc": { "type": "number", "description": "Valor", "example": 1500.00 }
+                          }
+                        },
+                        "detalhes": {
+                          "type": "object",
+                          "properties": {
+                            "cCodCateg": { "type": "string", "description": "Categoria Omie (opcional)", "example": "" },
+                            "cTipo": { "type": "string", "description": "DIN/BOL/TED/PIX...", "example": "PIX" },
+                            "cObsLanc": { "type": "string", "example": "Conciliacao OFX - FITID <uuid>" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "call": "IncluirLancCC",
+                "app_key": "{{OMIE_APP_KEY}}",
+                "app_secret": "{{OMIE_APP_SECRET}}",
+                "param": [
+                  {
+                    "cCodIntLanc": "a1b2c3d4e5f60718293a",
+                    "cabecalho": {
+                      "nCodCC": 123456789,
+                      "dDtLanc": "27/08/2026",
+                      "nValorLanc": 1500.00
+                    },
+                    "detalhes": {
+                      "cCodCateg": "",
+                      "cTipo": "PIX",
+                      "cObsLanc": "Conciliacao OFX - FITID <uuid>"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lancamento criado",
+            "content": {
+              "application/json": {
+                "example": {
+                  "nCodLanc": 987654321,
+                  "cCodIntLanc": "a1b2c3d4e5f60718293a",
+                  "cCodStatus": "0",
+                  "cDesStatus": "Lancamento cadastrado com sucesso"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/financas/pesquisartitulos/": {
+      "post": {
+        "tags": ["Debito"],
+        "summary": "PesquisarLancamentos - localizar titulo a pagar",
+        "operationId": "pesquisarLancamentos",
+        "description": "Busca candidatos a baixa por natureza + status + janela de vencimento (rota baixa_conta_pagar).\n\nConfirmado pelo WSDL (tipo ltPesquisarRequest): o call e PesquisarLancamentos (NAO PesquisarTitulos). Paginacao usa nPagina/nRegPorPagina. Datas sao por intervalo (dDtVencDe/dDtVencAte). NAO existe filtro nValorTitulo no request: o valor vem so na resposta (cabecTitulo.nValorTitulo) e o matching por valor e feito no cliente.\n\nO OFX nao traz CPF/CNPJ, entao o matching e por data + valor (client-side). Regra: exatamente 1 titulo EMABERTO casando -> baixa. 0 ou >1 -> fila manual.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call": { "type": "string", "example": "PesquisarLancamentos" },
+                  "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
+                  "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
+                  "param": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "nPagina": { "type": "integer", "description": "Pagina (inicia em 1) - obrigatorio", "example": 1 },
+                        "nRegPorPagina": { "type": "integer", "description": "Registros por pagina - obrigatorio", "example": 20 },
+                        "cNatureza": { "type": "string", "description": "P (pagar) / R (receber)", "example": "P" },
+                        "cStatus": { "type": "string", "description": "EMABERTO/ATRASADO/LIQUIDADO...", "example": "EMABERTO" },
+                        "dDtVencDe": { "type": "string", "description": "Inicio da janela de vencimento dd/mm/aaaa", "example": "27/08/2026" },
+                        "dDtVencAte": { "type": "string", "description": "Fim da janela de vencimento dd/mm/aaaa (pode = dDtVencDe)", "example": "27/08/2026" }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "call": "PesquisarLancamentos",
+                "app_key": "{{OMIE_APP_KEY}}",
+                "app_secret": "{{OMIE_APP_SECRET}}",
+                "param": [
+                  {
+                    "nPagina": 1,
+                    "nRegPorPagina": 20,
+                    "cNatureza": "P",
+                    "cStatus": "EMABERTO",
+                    "dDtVencDe": "27/08/2026",
+                    "dDtVencAte": "27/08/2026"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Titulos encontrados",
+            "content": {
+              "application/json": {
+                "example": {
+                  "nPagina": 1,
+                  "nTotPaginas": 1,
+                  "nRegistros": 1,
+                  "nTotRegistros": 1,
+                  "titulosEncontrados": [
+                    {
+                      "cabecTitulo": {
+                        "nCodTitulo": 555111222,
+                        "cCodIntTitulo": "",
+                        "cStatus": "EMABERTO",
+                        "nValorTitulo": 350.00,
+                        "dDtVenc": "27/08/2026"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/financas/contapagar/": {
+      "post": {
+        "tags": ["Debito"],
+        "summary": "LancarPagamento - baixar titulo a pagar",
+        "operationId": "lancarPagamento",
+        "description": "Da baixa em um titulo a pagar (rota baixa_conta_pagar). Retorna codigo_baixa (ancora de rastreio).\n\nAtencao: se a conta tiver Fluxo de Aprovacao, a baixa pode nao ser imediata. Os campos exatos devem ser confirmados na pagina logada do servico (pendencia P3).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call": { "type": "string", "example": "LancarPagamento" },
+                  "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
+                  "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
+                  "param": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "codigo_lancamento": { "type": "integer", "description": "nCodTitulo (do PesquisarLancamentos)", "example": 555111222 },
+                        "valor": { "type": "number", "description": "Valor pago", "example": 350.00 },
+                        "data": { "type": "string", "description": "Data da baixa dd/mm/aaaa", "example": "27/08/2026" },
+                        "id_conta_corrente": { "type": "integer", "description": "nCodCC de saida do pagamento", "example": 123456789 },
+                        "observacao": { "type": "string", "example": "Conciliacao OFX - FITID <uuid>" }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "call": "LancarPagamento",
+                "app_key": "{{OMIE_APP_KEY}}",
+                "app_secret": "{{OMIE_APP_SECRET}}",
+                "param": [
+                  {
+                    "codigo_lancamento": 555111222,
+                    "valor": 350.00,
+                    "data": "27/08/2026",
+                    "id_conta_corrente": 123456789,
+                    "observacao": "Conciliacao OFX - FITID <uuid>"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Baixa realizada",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo_lancamento": 555111222,
+                  "codigo_baixa": 777888999
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/financas/extrato/": {
+      "post": {
+        "tags": ["Conferencia"],
+        "summary": "ExtratoContaCorrente - conferencia de saldo",
+        "operationId": "extratoContaCorrente",
+        "description": "Consulta o extrato de uma conta para conferir saldo pos-processamento (somente leitura). Compare nSaldoAtual com o LEDGERBAL do OFX.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call": { "type": "string", "example": "ExtratoContaCorrente" },
+                  "app_key": { "type": "string", "example": "{{OMIE_APP_KEY}}" },
+                  "app_secret": { "type": "string", "example": "{{OMIE_APP_SECRET}}" },
+                  "param": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "nCodCC": { "type": "integer", "description": "Conta a conferir", "example": 123456789 },
+                        "dPeriodoInicial": { "type": "string", "description": "dd/mm/aaaa", "example": "01/08/2026" },
+                        "dPeriodoFinal": { "type": "string", "description": "dd/mm/aaaa", "example": "31/08/2026" }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "call": "ExtratoContaCorrente",
+                "app_key": "{{OMIE_APP_KEY}}",
+                "app_secret": "{{OMIE_APP_SECRET}}",
+                "param": [
+                  {
+                    "nCodCC": 123456789,
+                    "dPeriodoInicial": "01/08/2026",
+                    "dPeriodoFinal": "31/08/2026"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Extrato da conta",
+            "content": {
+              "application/json": {
+                "example": {
+                  "nCodCC": 123456789,
+                  "dPeriodoInicial": "01/08/2026",
+                  "dPeriodoFinal": "31/08/2026",
+                  "nSaldoAnterior": 10000.00,
+                  "nSaldoAtual": 11150.00,
+                  "nSaldoConciliado": 11150.00,
+                  "nSaldoDisponivel": 11150.00,
+                  "listaMovimentos": []
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {}
+  }
+}

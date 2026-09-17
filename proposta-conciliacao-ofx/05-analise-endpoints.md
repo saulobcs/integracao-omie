@@ -42,8 +42,10 @@ Content-Type: application/json
 | Rota do conciliador | Endpoint | `call` | Papel |
 |---------------------|----------|--------|-------|
 | (setup) mapear conta | `/geral/contacorrente/` | `ListarContasCorrentes` | Descobrir `nCodCC` (pendência P1) |
+| (setup) categorias | `/geral/categorias/` | `ListarCategorias` | Descobrir valores válidos de `cCodCateg` |
+| (setup) tipos de documento | `/geral/tiposdoc/` | `PesquisarTipoDocumento` | Descobrir valores válidos de `cTipo` (PIX/DIN/BOL/TED...) |
 | credito_roteado | `/financas/contacorrentelancamentos/` | `IncluirLancCC` | Lançar crédito na conta destino |
-| baixa_conta_pagar (buscar) | `/financas/pesquisartitulos/` | `PesquisarTitulos` | Localizar o título a pagar |
+| baixa_conta_pagar (buscar) | `/financas/pesquisartitulos/` | `PesquisarLancamentos` | Localizar o título a pagar |
 | baixa_conta_pagar (baixar) | `/financas/contapagar/` | `LancarPagamento` | Dar baixa no título |
 | (conferência) | `/financas/extrato/` | `ExtratoContaCorrente` | Conferir saldo pós-processamento |
 
@@ -80,6 +82,64 @@ Content-Type: application/json
 
 ---
 
+## 1a. `ListarCategorias` — valores válidos de `cCodCateg`
+
+**Endpoint:** `/api/v1/geral/categorias/` · **Uso:** setup (descobrir os códigos de
+categoria que vão em `detalhes.cCodCateg` do `IncluirLancCC`).
+
+### Requisição (param)
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `pagina` | integer | Página (inicia em 1) |
+| `registros_por_pagina` | integer | ≤ 100 (recomendado) |
+| `filtrar_apenas_ativas` | string(1) | S/N (opcional) |
+
+### Resposta (campos-chave por categoria)
+| Campo | Descrição |
+|-------|-----------|
+| `codigo` | **Código da categoria (string 20)** — é o valor que vai em `cCodCateg` |
+| `descricao` | Descrição da categoria |
+| `natureza` | Natureza (receita/despesa...) |
+| `tipo_categoria` | Tipo da categoria |
+| `codigo_dre` | Conta do DRE associada |
+| `conta_inativa` | S/N |
+
+### Pode / Não pode
+- **Pode:** listar as categorias disponíveis e escolher o `codigo` correto para
+  cada regra de roteamento (preenche os `ccodcateg: null` de
+  [`03-regras-de-roteamento.md`](./03-regras-de-roteamento.md)).
+- **Atenção:** o campo é opcional no `IncluirLancCC`, mas para categorizar o
+  lançamento corretamente o `codigo` precisa existir e estar ativo.
+
+---
+
+## 1b. `PesquisarTipoDocumento` — valores válidos de `cTipo`
+
+**Endpoint:** `/api/v1/geral/tiposdoc/` · **Uso:** setup (descobrir os códigos de
+tipo de documento que vão em `detalhes.cTipo` do `IncluirLancCC`).
+
+### Requisição (param)
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `filtrar_por_codigo` | string(5) | Opcional — busca direta por código |
+| `filtrar_por_descricao` | string | Opcional — busca por descrição |
+
+*(Sem filtro, retorna a lista completa de tipos de documento.)*
+
+### Resposta (campos-chave por tipo)
+| Campo | Descrição |
+|-------|-----------|
+| `codigo` | **Código do tipo de documento (string 5)** — é o valor que vai em `cTipo` (ex.: PIX, DIN, BOL, TED) |
+| `descricao` | Descrição do tipo |
+
+### Pode / Não pode
+- **Pode:** obter a lista canônica de tipos aceitos e mapear cada regra de crédito
+  ao `cTipo` adequado (ex.: crédito Pix → `PIX`).
+- **Atenção:** usar sempre o `codigo` retornado por este endpoint; valores
+  "chutados" podem ser rejeitados pela Omie.
+
+---
+
 ## 2. `IncluirLancCC` — lançar crédito roteado (rota `credito_roteado`)
 
 **Endpoint:** `/api/v1/financas/contacorrentelancamentos/`
@@ -105,11 +165,12 @@ Content-Type: application/json
 ### Pode / Não pode
 - **Pode:** criar um lançamento de crédito na conta destino com um identificador
   próprio (`cCodIntLanc`).
-- **PONTO CRÍTICO — limite de 20 caracteres:** `cCodIntLanc` é **string(20)**, mas
-  o FITID da Stone é um **UUID de 36 caracteres**. **O FITID não cabe direto.**
-  Solução recomendada: gerar um **hash determinístico** do FITID truncado a 20
-  chars (ex.: 20 primeiros hex de um SHA-256 do FITID). Determinístico = mesmo
-  FITID gera sempre o mesmo `cCodIntLanc` → idempotência server-side preservada.
+- **Limite de 20 caracteres (RESOLVIDO):** `cCodIntLanc` é **string(20)**, mas
+  o FITID da Stone é um **UUID de 36 caracteres** — não cabe direto. Implementado
+  em `acoes.py` (`_derivar_ccodintlanc`): usa o FITID se couber em 20 chars, senão
+  os **20 primeiros hex de `sha256(fitid)`**. Determinístico = mesmo FITID gera
+  sempre o mesmo `cCodIntLanc` → idempotência server-side preservada. O FITID
+  original fica no payload como `fitid_origem`.
 - **Idempotência server-side:** sendo `cCodIntLanc` obrigatório e único, reenviar
   o mesmo código tende a ser rejeitado pela Omie (a confirmar o comportamento
   exato: erro vs. upsert).
@@ -118,38 +179,54 @@ Content-Type: application/json
 
 ---
 
-## 3. `PesquisarTitulos` — localizar título a pagar (rota `baixa_conta_pagar`)
+## 3. `PesquisarLancamentos` — localizar título a pagar (rota `baixa_conta_pagar`)
 
 **Endpoint:** `/api/v1/financas/pesquisartitulos/`
 
-### Requisição (filtros principais)
+> **Correção confirmada pelo WSDL oficial** (`/financas/pesquisartitulos/?WSDL`):
+> o `call` correto é **`PesquisarLancamentos`** (não `PesquisarTitulos`, que
+> retorna `Method "PesquisarTitulos" not exists`). O tipo de request é
+> `ltPesquisarRequest`. Datas são por **intervalo** (De/Até) e **não há filtro
+> de valor** no request.
+
+### Requisição (filtros principais — tipo `ltPesquisarRequest`)
 | Campo | Tipo | Descrição |
 |-------|------|-----------|
+| `nPagina` | integer | **Página (inicia em 1)** — obrigatório |
+| `nRegPorPagina` | integer | **Registros por página** — obrigatório |
 | `cNatureza` | string(1) | **P** (pagar) / R (receber) |
-| `nValorTitulo` | decimal | Valor do título |
-| `dDtVenc` | date | Vencimento |
-| `cCPFCNPJCliente` | string | Documento da contraparte |
 | `cStatus` | string | EMABERTO/ATRASADO/LIQUIDADO/RECEBIDO... |
+| `dDtVencDe` / `dDtVencAte` | date | **Vencimento por intervalo** (dd/mm/aaaa) |
+| `dDtEmisDe` / `dDtEmisAte` | date | Emissão por intervalo |
+| `dDtPrevDe` / `dDtPrevAte` | date | Previsão por intervalo |
+| `cCPFCNPJCliente` | string | Documento da contraparte |
 | `cTipo`, `cOperacao`, `cChaveNFe` | string | Filtros adicionais |
+| `cCodCateg` | string | Categoria |
+| `nCodCC` | integer | Conta corrente |
 | `nCodTitulo` / `cCodIntTitulo` | int/string | Busca direta por ID |
 
-### Resposta (por título)
+> **Não existem** os filtros `dDtVenc` (data única) nem `nValorTitulo` no request.
+
+### Resposta (por título — `titulosEncontrados[].cabecTitulo`)
 | Campo | Descrição |
 |-------|-----------|
 | `nCodTitulo` | **ID do título** (usado depois no `LancarPagamento`) |
 | `cCodIntTitulo` | Código de integração do título |
 | `cStatus` | Situação atual |
-| `nValorTitulo` | Valor |
+| `nValorTitulo` | Valor (só na resposta — usar no matching client-side) |
 | `dDtVenc` | Vencimento |
 
 ### Pode / Não pode
-- **Pode:** buscar candidatos a baixa por valor + status EMABERTO/ATRASADO.
-- **NÃO PODE (limitação real):** o OFX **não traz CPF/CNPJ nem número de
-  documento** — só nome no MEMO. Então a busca fica por **valor + data**, o que
-  pode retornar **múltiplos candidatos** (há valores repetidos no extrato). O
-  filtro por documento, que seria o mais preciso, não é alimentável pelo OFX.
-- **Regra:** achou exatamente 1 título EMABERTO → seguir p/ baixa. 0 ou >1 →
-  fila manual.
+- **Pode:** buscar candidatos a baixa por natureza + status + **janela de
+  vencimento** (`dDtVencDe`/`dDtVencAte`).
+- **NÃO PODE — filtrar por valor na API:** `ltPesquisarRequest` não tem
+  `nValorTitulo`. O casamento por valor é feito **no cliente**, comparando
+  `cabecTitulo.nValorTitulo` de cada título retornado com o valor do débito OFX.
+- **NÃO PODE (limitação do OFX):** o OFX **não traz CPF/CNPJ nem número de
+  documento** — só nome no MEMO. A busca fica por **data + status** e o valor é
+  conferido depois, o que pode gerar **múltiplos candidatos** (valores repetidos).
+- **Regra:** dos retornados, filtrar por valor → exatamente 1 EMABERTO casando →
+  seguir p/ baixa. 0 ou >1 → fila manual.
 
 ---
 
@@ -233,18 +310,22 @@ Content-Type: application/json
 - **Não** garantir baixa imediata em contas a pagar se houver Fluxo de Aprovação
   configurado.
 - **Não** usar o FITID inteiro como código de integração em `IncluirLancCC`
-  (limite de 20 chars vs. UUID de 36) — exige hash/derivação.
+  (limite de 20 chars vs. UUID de 36). **Resolvido:** hash determinístico via
+  `_derivar_ccodintlanc` (`acoes.py`).
 
 ---
 
 ## Pendências que esta análise reforça
 
-- **P1** — obter `nCodCC` via `ListarContasCorrentes`.
+- **P1** — obter `nCodCC` via `ListarContasCorrentes`; e resolver os valores de
+  `cCodCateg` (via `ListarCategorias`) e `cTipo` (via `PesquisarTipoDocumento`)
+  para preencher o mapa de roteamento.
 - **P3** — confirmar, na página logada, os campos de idempotência/identificação em
   `IncluirLancCC` (comportamento do `cCodIntLanc` duplicado) e em `LancarPagamento`.
-- **Nova sub-pendência (P3.1):** definir a **estratégia de derivação do FITID → 
-  `cCodIntLanc`** (hash determinístico de 20 chars) e persistir o vínculo
-  FITID ⇄ cCodIntLanc ⇄ nCodLanc/codigo_baixa.
+- **P3.1 (RESOLVIDO):** derivação do FITID → `cCodIntLanc` implementada em
+  `acoes.py` (`_derivar_ccodintlanc`, hash determinístico de 20 chars). Falta
+  apenas persistir o vínculo FITID ⇄ cCodIntLanc ⇄ nCodLanc/codigo_baixa numa
+  tabela de rastreio quando a escrita for habilitada.
 
 ---
 
