@@ -26,7 +26,59 @@ relatório (CSV + JSON). Ele tem **dois modos** (ver seção 4):
 
 ---
 
-## 2. Configurar as credenciais (`.env`)
+## 2. Criar o ambiente virtual
+
+Crie o ambiente uma vez por máquina, dentro de `conciliador-ofx/`. A pasta
+`.venv/` é local e já é ignorada pelo Git. Embora o projeto hoje use somente a
+biblioteca padrão, o ambiente virtual padroniza a execução e isola futuras
+dependências.
+
+### macOS
+
+```bash
+cd conciliador-ofx
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+### Windows (PowerShell)
+
+```powershell
+cd conciliador-ofx
+py -3 -m venv .venv
+.venv\Scripts\python.exe -m pip install --upgrade pip
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Não é necessário ativar o ambiente virtual: os comandos deste guia usam
+diretamente o interpretador dentro de `.venv`. Se preferir ativá-lo, use
+`source .venv/bin/activate` no macOS ou `.\.venv\Scripts\Activate.ps1` no
+PowerShell.
+
+### Interface gráfica e lançadores
+
+Para a execução sem comandos de conciliação, use a interface local no navegador
+(`conciliador_web.py`). O lançador abre a página automaticamente; ela permite
+escolher o OFX, mostra o resumo ao término e só oferece os modos seguros
+`offline` e `dry-run`. O modo `apply` continua restrito à linha de comando com
+`--confirmar`.
+
+| Sistema | Arquivo para abrir |
+|---------|--------------------|
+| Windows | `executar_conciliador.bat` |
+| macOS | `executar_conciliador.command` |
+| Linux | `executar_conciliador.sh` |
+
+No macOS e Linux, dê permissão de execução ao lançador uma única vez:
+
+```bash
+chmod +x executar_conciliador.sh executar_conciliador.command
+```
+
+---
+
+## 3. Configurar as credenciais (`.env`)
 
 As credenciais ficam num arquivo `.env` na raiz de `conciliador-ofx/`. Esse
 arquivo **não é versionado** (está no `.gitignore`). Há um modelo em
@@ -54,7 +106,7 @@ OMIE_BASE=https://app.omie.com.br/api/v1
 
 ---
 
-## 3. Modelo de segurança (por modo)
+## 4. Modelo de segurança (por modo)
 
 O `OmieClient` tem duas allow-lists em `conciliador/omie_client.py`:
 
@@ -80,20 +132,23 @@ por testes automatizados (ver seção 6).
 
 ---
 
-## 4. Executar
+## 5. Executar
 
 A partir da pasta `conciliador-ofx/`:
 
 ```bash
-# Com os caminhos padrão (extrato de referência)
-python3 main.py
+# macOS: com os caminhos padrão (extrato de referência)
+.venv/bin/python main.py
 
-# Apontando para um extrato específico
-python3 main.py \
+# macOS: apontando para um extrato específico
+.venv/bin/python main.py \
   --ofx "../arquivos-referencia/Stone.ofx" \
   --config config/roteamento.json \
   --saida saida
 ```
+
+No Windows PowerShell, substitua `.venv/bin/python` por
+`.venv\Scripts\python.exe` nos comandos abaixo.
 
 ### Argumentos
 
@@ -115,13 +170,13 @@ python3 main.py \
 
 ```bash
 # dry-run (padrão): consulta, não escreve
-python3 main.py --ofx "../arquivos-referencia/Stone.ofx"
+.venv/bin/python main.py --ofx "../arquivos-referencia/Stone.ofx"
 
 # offline: sem nenhuma chamada à API
-python3 main.py --ofx "../arquivos-referencia/Stone.ofx" --modo offline
+.venv/bin/python main.py --ofx "../arquivos-referencia/Stone.ofx" --modo offline
 
 # apply: EXECUÇÃO REAL (exige --confirmar)
-python3 main.py --ofx "../arquivos-referencia/Stone.ofx" --modo apply --confirmar
+.venv/bin/python main.py --ofx "../arquivos-referencia/Stone.ofx" --modo apply --confirmar
 ```
 
 > **`apply` é escrita real.** Sem `--confirmar`, o programa aborta com aviso. O
@@ -135,7 +190,7 @@ python3 main.py --ofx "../arquivos-referencia/Stone.ofx" --modo apply --confirma
 
 ---
 
-## 5. Saída
+## 6. Saída
 
 Cada execução gera dois arquivos em `saida/` com timestamp:
 
@@ -150,11 +205,11 @@ rota (crédito roteado / baixa de conta a pagar / manual) e por regra.
 
 ---
 
-## 6. Testes
+## 7. Testes
 
 ```bash
 cd conciliador-ofx
-python3 -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
 Os testes cobrem:
@@ -169,7 +224,7 @@ Os testes cobrem:
 
 ---
 
-## 7. O que preparar antes de conciliar um extrato novo
+## 8. O que preparar antes de conciliar um extrato novo
 
 1. **Preencher/ajustar `config/roteamento.json`** para a conta de origem:
    identificação (`BANKID`/`ACCTID`), `nCodCC` de origem e destinos, e as regras
