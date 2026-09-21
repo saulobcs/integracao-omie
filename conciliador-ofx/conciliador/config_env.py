@@ -55,12 +55,18 @@ def _parse_env_file(caminho: str) -> Dict[str, str]:
 def carregar_credenciais(env_path: Optional[str] = None) -> Credenciais:
     """Carrega credenciais do .env (se houver) + variaveis de ambiente.
 
-    Precedencia: variavel de ambiente > .env > padrao. Assim da para sobrescrever
-    pontualmente sem editar o arquivo (ex.: `OMIE_APP_KEY=... python main.py`).
+    A PRECEDENCIA depende de como a funcao e chamada:
 
-    Se `env_path` nao for informado, procura um `.env` ao lado do pacote
-    (raiz do projeto conciliador-ofx/).
+    - `env_path` explicito (uso MULTICLIENTE): o `.env` do cliente tem
+      PRIORIDADE sobre a variavel de ambiente do processo. Isso evita que uma
+      `OMIE_APP_KEY` global vaze para o contexto de outro cliente -- cada
+      cliente usa exatamente as credenciais do seu proprio arquivo.
+
+    - sem `env_path` (uso padrao/single): usa o `.env` da raiz do projeto e a
+      variavel de ambiente tem PRIORIDADE, permitindo override pontual
+      (ex.: `OMIE_APP_KEY=... python main.py`).
     """
+    cliente_explicito = env_path is not None
     if env_path is None:
         raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         env_path = os.path.join(raiz, ".env")
@@ -68,7 +74,10 @@ def carregar_credenciais(env_path: Optional[str] = None) -> Credenciais:
     arquivo = _parse_env_file(env_path)
 
     def _get(chave: str, padrao: Optional[str] = None) -> Optional[str]:
-        # Ambiente do processo tem prioridade sobre o .env.
+        if cliente_explicito:
+            # Multicliente: o .env do cliente vence o ambiente do processo.
+            return arquivo.get(chave) or os.environ.get(chave) or padrao
+        # Single: ambiente vence, para override pontual.
         return os.environ.get(chave) or arquivo.get(chave) or padrao
 
     return Credenciais(
