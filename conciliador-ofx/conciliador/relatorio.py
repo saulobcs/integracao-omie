@@ -34,7 +34,8 @@ def gerar_resumo(registros: List[Dict[str, Any]]) -> Dict[str, Any]:
 def escrever_csv(caminho: str, registros: List[Dict[str, Any]]) -> None:
     campos = [
         "fitid", "data", "tipo", "valor", "memo",
-        "rota", "regra", "acao_omie", "call", "endpoint", "motivo",
+        "rota", "regra", "conta_origem", "conta_destino",
+        "acao_omie", "call", "endpoint", "motivo",
     ]
     with open(caminho, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=campos, extrasaction="ignore")
@@ -51,6 +52,10 @@ def escrever_json(caminho: str, registros: List[Dict[str, Any]], resumo: Dict[st
 
 def imprimir_resumo(resumo: Dict[str, Any]) -> None:
     print("\n=== RESUMO DO PROCESSAMENTO (DRY-RUN) ===")
+    extrato = resumo.get("extrato", {})
+    if extrato:
+        conta_origem = extrato.get("conta_origem") or extrato.get("origem_identificada") or "NAO MAPEADA"
+        print(f"Conta de origem: {conta_origem} (OFX banco {extrato.get('banco')} / conta {extrato.get('conta')})")
     print(f"Total de transacoes: {resumo['total_transacoes']}")
     print("\nPor rota:")
     for rota, qtd in sorted(resumo["por_rota"].items(), key=lambda x: -x[1]):

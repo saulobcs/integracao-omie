@@ -1,0 +1,297 @@
+OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:USASCII
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEUID:NONE
+NEWFILEUID:NONE
+
+<OFX>
+	<SIGNONMSGSRSV1>
+		<SONRS>
+			<STATUS>
+				<CODE>0</CODE>
+				<SEVERITY>INFO</SEVERITY>
+			</STATUS>
+			<DTSERVER>20260904131844[0:GMT]
+			<LANGUAGE>POR</LANGUAGE>
+			<FI>
+				<ORG>Stone Instituição de Pagamento S.A.</ORG>
+				<FID>197</FID>
+			</FI>
+		</SONRS>
+	</SIGNONMSGSRSV1>
+	<BANKMSGSRSV1>
+		<STMTTRNRS>
+			<TRNUID>1</TRNUID>
+			<STATUS>
+				<CODE>0</CODE>
+				<SEVERITY>INFO</SEVERITY>
+			</STATUS>
+			<STMTRS>
+				<CURDEF>BRL</CURDEF>
+				<BANKACCTFROM>
+					<BANKID>0197</BANKID>
+					<BRANCHID>1</BRANCHID>	
+					<ACCTID>6684788-0</ACCTID>
+					<ACCTTYPE>CHECKING</ACCTTYPE>
+				</BANKACCTFROM>
+				<BANKTRANLIST>
+					<DTSTART>20260903000000[-3:BRT]</DTSTART>
+					<DTEND>20260903000000[-3:BRT]</DTEND>  
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903222650</DTPOSTED>
+						<TRNAMT>48.67</TRNAMT>
+						<FITID>190205a3-f572-4767-8e1a-fd20856c17ea</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903215158</DTPOSTED>
+						<TRNAMT>26.73</TRNAMT>
+						<FITID>710a5a8e-adaa-4a8c-842e-d74c31d79582</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903215157</DTPOSTED>
+						<TRNAMT>9.85</TRNAMT>
+						<FITID>0fd8bd38-0032-4547-b809-189cf24b6d7a</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903214727</DTPOSTED>
+						<TRNAMT>83.63</TRNAMT>
+						<FITID>55a1588b-ec47-4051-a446-91903fed3f3c</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903214726</DTPOSTED>
+						<TRNAMT>83.72</TRNAMT>
+						<FITID>3aca70c1-d6f1-467b-a3ce-6c31b45eccb6</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903214209</DTPOSTED>
+						<TRNAMT>109.00</TRNAMT>
+						<FITID>838a3740-58d8-4998-b111-8a00c20a0120</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903213759</DTPOSTED>
+						<TRNAMT>45.95</TRNAMT>
+						<FITID>a95cc65f-ca97-43ec-b3f3-f59d583519c8</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903210401</DTPOSTED>
+						<TRNAMT>70.89</TRNAMT>
+						<FITID>c6efea34-3d3a-4d05-acca-ecca6af6cf91</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903205820</DTPOSTED>
+						<TRNAMT>61.13</TRNAMT>
+						<FITID>6ae7e679-6f2f-471a-a880-4257f3b1e470</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903204314</DTPOSTED>
+						<TRNAMT>67.04</TRNAMT>
+						<FITID>0b80bbf1-cc9b-4e91-92e1-b6e8fabe1c21</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903203801</DTPOSTED>
+						<TRNAMT>43.99</TRNAMT>
+						<FITID>c4aa2fbd-fd1d-4787-9835-5899a2851569</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903203248</DTPOSTED>
+						<TRNAMT>61.32</TRNAMT>
+						<FITID>06dc15a5-07f0-43c5-987a-99e068f508b1</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903202755</DTPOSTED>
+						<TRNAMT>58.60</TRNAMT>
+						<FITID>22e32b84-927c-423c-a09c-f92e8b2407ac</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903201221</DTPOSTED>
+						<TRNAMT>143.73</TRNAMT>
+						<FITID>59cd5756-32cf-4735-b4a4-c6970c1d8b9b</FITID>
+						<MEMO>Recebimento de vendas - Valor referente à liquidação de suas vendas de cartão.</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903201221</DTPOSTED>
+						<TRNAMT>98.61</TRNAMT>
+						<FITID>80bca236-675d-45bb-b345-41857d86b823</FITID>
+						<MEMO>Recebimento de vendas - Valor referente à liquidação de suas vendas de cartão.</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903200708</DTPOSTED>
+						<TRNAMT>49.31</TRNAMT>
+						<FITID>92305dcb-013d-4b84-8abe-c5633a437515</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903195152</DTPOSTED>
+						<TRNAMT>73.20</TRNAMT>
+						<FITID>6ae6dd4f-51f2-463c-bebd-0d921c6ab84e</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903195152</DTPOSTED>
+						<TRNAMT>62.91</TRNAMT>
+						<FITID>b79f0ad5-90c4-48bc-979d-b36e6846fbf4</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903194304</DTPOSTED>
+						<TRNAMT>125.03</TRNAMT>
+						<FITID>6ea95afe-a594-4376-9458-8c7c3dff2d51</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903193459</DTPOSTED>
+						<TRNAMT>40.86</TRNAMT>
+						<FITID>f29250e7-ea11-44f4-a0cd-ad2eae69cbfd</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903192956</DTPOSTED>
+						<TRNAMT>49.75</TRNAMT>
+						<FITID>99910464-7dcd-4fbb-8258-deccb60125ea</FITID>
+						<MEMO>GABRIELLY CRISTINE GONCALVES SILVA - Pix | Maquininha</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903185600</DTPOSTED>
+						<TRNAMT>56.06</TRNAMT>
+						<FITID>92b2b9ba-8cde-4e8b-bb30-b613ed95e22c</FITID>
+						<MEMO>LARISSA AGNER SOARES TEIXEIRA - Pix | Maquininha</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903175630</DTPOSTED>
+						<TRNAMT>35.04</TRNAMT>
+						<FITID>d4404914-0ce9-4ac5-b840-594388735d74</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903173939</DTPOSTED>
+						<TRNAMT>47.91</TRNAMT>
+						<FITID>2b89cfae-51e5-43d1-9d77-73513432e19d</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903152052</DTPOSTED>
+						<TRNAMT>4.98</TRNAMT>
+						<FITID>2f14fc0d-d7f1-49c8-85ec-2cbc45cb308e</FITID>
+						<MEMO>Patriny Martins de Lacerda - Pix | Maquininha</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903150223</DTPOSTED>
+						<TRNAMT>65.15</TRNAMT>
+						<FITID>af0be90b-e18c-48f2-b5bc-61b5026713ac</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903144943</DTPOSTED>
+						<TRNAMT>7.79</TRNAMT>
+						<FITID>9cadbc69-9f9f-4068-a58f-c8aba6650d13</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903135825</DTPOSTED>
+						<TRNAMT>47.91</TRNAMT>
+						<FITID>935eb3ff-801c-4773-a7b0-91b40fca4662</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903135648</DTPOSTED>
+						<TRNAMT>49.31</TRNAMT>
+						<FITID>db2d2bb9-0130-4c9b-af2e-599a1dbc3e4a</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903131945</DTPOSTED>
+						<TRNAMT>37.62</TRNAMT>
+						<FITID>6ded0c22-7174-4039-9077-6e5c5f4e7ffe</FITID>
+						<MEMO>Mellory Evellyn Silva Soares - Pix | Maquininha</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903124526</DTPOSTED>
+						<TRNAMT>92.56</TRNAMT>
+						<FITID>64b2a8a1-3bb3-4ca0-9755-f286701319cd</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903123514</DTPOSTED>
+						<TRNAMT>66.87</TRNAMT>
+						<FITID>187e0247-90ee-4683-b1ab-4becd8572d8a</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903115525</DTPOSTED>
+						<TRNAMT>19.62</TRNAMT>
+						<FITID>935ecec8-df2e-4863-8054-b1ead4952725</FITID>
+						<MEMO>Recebimento vendas - Antecipação</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>DEBIT</TRNTYPE>
+						<DTPOSTED>20260903093156</DTPOSTED>
+						<TRNAMT>-1546.42</TRNAMT>
+						<FITID>3f3010c0-5aa4-439a-b614-6463c8a6362d</FITID>
+						<MEMO>OESA COMERCIO E REPRESENTACOES S A - Pagamento</MEMO>
+					</STMTTRN>   
+					<STMTTRN>
+						<TRNTYPE>CREDIT</TRNTYPE>
+						<DTPOSTED>20260903063551</DTPOSTED>
+						<TRNAMT>37.97</TRNAMT>
+						<FITID>b84ca58d-4420-4378-a61f-18bc73b63236</FITID>
+						<MEMO>IFOODCOM AGENCIA DE RESTAURANTES ONLINE SA - Transferência | Pix</MEMO>
+					</STMTTRN>   
+				</BANKTRANLIST>
+				<LEDGERBAL>
+					<BALAMT>2799.62</BALAMT>
+					<DTASOF>20260903000000[-3:BRL]</DTASOF>
+				</LEDGERBAL>
+			</STMTRS>
+		</STMTTRNRS>
+	</BANKMSGSRSV1>
+</OFX>

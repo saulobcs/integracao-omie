@@ -1,0 +1,3 @@
+# O conciliador atualmente utiliza somente a biblioteca padrão do Python.
+# Este arquivo existe para padronizar a criação do ambiente virtual e receber
+# dependências futuras, caso sejam necessárias.
