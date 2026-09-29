@@ -16,9 +16,10 @@ import webbrowser
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
-from main import _CONFIG_PADRAO, _SAIDA_PADRAO, escrever_csv, escrever_json, processar
+from conciliador.perfis import PerfilInvalido, carregar_perfil, listar_perfis
+from main import escrever_csv, escrever_json, processar
 
 _HTML = """<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -32,12 +33,17 @@ button{margin-top:24px;padding:11px 18px;border:0;border-radius:6px;background:#
 
 def _pagina_inicial(mensagem: str = "") -> bytes:
     aviso = f'<p class="note">{html.escape(mensagem)}</p>' if mensagem else ""
+    opcoes = "".join(
+        f'<option value="{html.escape(perfil.id)}">{html.escape(perfil.nome)}</option>'
+        for perfil in listar_perfis()
+    )
     conteudo = f"""
 <h1>Conciliador OFX → Omie</h1>
 <p class="note">A interface é local: os dados não saem deste computador, exceto pelas consultas da API no modo dry-run.</p>
 <p class="warning"><strong>Segurança:</strong> esta interface oferece apenas os modos offline e dry-run. Ela nunca executa o modo apply.</p>
 {aviso}
 <form method="post" enctype="multipart/form-data">
+  <label>Cliente<select name="cliente" required>{opcoes}</select></label>
   <label>Arquivo OFX<input type="file" name="ofx" accept=".ofx,.OFX" required></label>
   <label>Modo<select name="modo"><option value="offline">Offline — sem acessar a API Omie</option><option value="dry-run">Dry-run — consulta, mas não grava no Omie</option></select></label>
   <button type="submit">Processar extrato</button>
@@ -76,6 +82,7 @@ class Aplicacao(BaseHTTPRequestHandler):
             if "ofx" not in formulario or not getattr(formulario["ofx"], "file", None):
                 raise ValueError("Selecione um arquivo OFX válido.")
             modo = formulario.getfirst("modo", "offline")
+            perfil = carregar_perfil(formulario.getfirst("cliente", ""))
             if modo not in {"offline", "dry-run"}:
                 raise ValueError("Modo de execução inválido.")
 
@@ -87,11 +94,17 @@ class Aplicacao(BaseHTTPRequestHandler):
                 temporario.write(conteudo)
                 caminho_temporario = temporario.name
             try:
-                registros, resumo = processar(caminho_temporario, _CONFIG_PADRAO, modo=modo)
+                registros, resumo = processar(
+                    caminho_temporario,
+                    perfil.config_path,
+                    perfil.plano_contas_path,
+                    modo=modo,
+                    perfil=perfil,
+                )
             finally:
                 os.unlink(caminho_temporario)
 
-            pasta = Path(_SAIDA_PADRAO)
+            pasta = Path(perfil.saida_path)
             pasta.mkdir(parents=True, exist_ok=True)
             instante = datetime.now().strftime("%Y%m%d_%H%M%S")
             csv = pasta / f"conciliacao_{instante}.csv"
@@ -104,6 +117,7 @@ class Aplicacao(BaseHTTPRequestHandler):
             )
             resultado = f"""
 <h1>Processamento concluído</h1><div class="result">Modo: {html.escape(resumo.get("modo", modo))}
+Cliente: {html.escape(perfil.nome)}
 Conta: {html.escape(str(extrato.get("conta_origem") or extrato.get("origem_identificada") or "não mapeada"))}
 Transações: {resumo.get("total_transacoes", 0)}
 Pendências manuais: {resumo.get("em_manual", 0)}

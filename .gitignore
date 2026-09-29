@@ -15,6 +15,7 @@ dist/
 venv/
 env/
 .env
+conciliador-ofx/clientes/*/.env
 
 # Saída gerada pela conciliação
 conciliador-ofx/saida/

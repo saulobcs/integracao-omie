@@ -1,0 +1,17 @@
+{
+  "clientes": [
+    {
+      "id": "haru",
+      "nome": "Haru",
+      "config": "config/roteamento.json",
+      "plano_contas": "../arquivos-referencia/contas-haru.json",
+      "env": "clientes/haru/.env",
+      "saida": "saida/haru",
+      "confirmacao_apply": "HARU",
+      "contas_ofx_permitidas": [
+        { "bankid": "0197", "acctid": "6684788-0", "nome": "Stone" },
+        { "bankid": "748", "acctid": "2580000000157815", "nome": "Sicredi" }
+      ]
+    }
+  ]
+}

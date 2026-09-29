@@ -26,6 +26,7 @@ from conciliador.acoes import ExecutorApply, ExecutorDryRun
 from conciliador.config_env import carregar_credenciais
 from conciliador.omie_client import OmieClient
 from conciliador.parser_ofx import parse_ofx
+from conciliador.perfis import PerfilCliente, carregar_perfil
 from conciliador.regras import MotorDeRegras
 from conciliador.relatorio import (
     escrever_csv,
@@ -56,7 +57,7 @@ def carregar_plano_contas(caminho: str) -> Dict[int, str]:
     return {int(c["nCodCC"]): c.get("descricao", "") for c in contas if "nCodCC" in c}
 
 
-def _criar_executor(modo: str, config, origem, plano_contas):
+def _criar_executor(modo: str, config, origem, plano_contas, env_path: str | None = None):
     """Cria o executor conforme o modo.
 
     - 'offline'  : dry-run sem API (nenhuma chamada; so payload proposto).
@@ -65,7 +66,7 @@ def _criar_executor(modo: str, config, origem, plano_contas):
 
     Retorna (executor, info_modo) onde info_modo descreve o cliente usado.
     """
-    cred = carregar_credenciais()
+    cred = carregar_credenciais(env_path)
 
     if modo == "offline":
         return ExecutorDryRun(config, origem, plano_contas, client=None), "offline (sem API)"
@@ -90,13 +91,25 @@ def processar(
     config_path: str,
     plano_contas_path: str = _PLANO_CONTAS_PADRAO,
     modo: str = "dry-run",
+    perfil: PerfilCliente | None = None,
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     extrato = parse_ofx(ofx_path)
     motor = MotorDeRegras.de_arquivo(config_path)
     origem = motor.selecionar_origem(extrato)
+    if perfil is not None:
+        # Duplo check obrigatório: antes de carregar credenciais ou consultar a
+        # API, confirma que BANKID/ACCTID pertencem ao perfil selecionado.
+        perfil.validar_extrato(extrato)
+        if origem is None:
+            raise ValueError(
+                f"BLOQUEADO: a conta do OFX é permitida para {perfil.nome}, mas "
+                "não possui regra de roteamento no perfil."
+            )
     plano_contas = carregar_plano_contas(plano_contas_path)
 
-    executor, info_modo = _criar_executor(modo, motor.config, origem, plano_contas)
+    executor, info_modo = _criar_executor(
+        modo, motor.config, origem, plano_contas, perfil.env_path if perfil else None
+    )
 
     registros: List[Dict[str, Any]] = []
     for t in extrato.transacoes:
@@ -122,6 +135,8 @@ def processar(
         )
     resumo = gerar_resumo(registros)
     resumo["modo"] = info_modo
+    if perfil is not None:
+        resumo["cliente"] = {"id": perfil.id, "nome": perfil.nome}
     resumo["extrato"] = {
         "banco": extrato.bankid,
         "conta": extrato.acctid,
@@ -137,8 +152,7 @@ def processar(
 def main() -> None:
     ap = argparse.ArgumentParser(description="Conciliador OFX x Omie (dry-run)")
     ap.add_argument("--ofx", default=_OFX_PADRAO, help="Caminho do arquivo OFX")
-    ap.add_argument("--config", default=_CONFIG_PADRAO, help="Caminho do JSON de roteamento")
-    ap.add_argument("--saida", default=_SAIDA_PADRAO, help="Pasta de saida dos relatorios")
+    ap.add_argument("--cliente", required=True, help="Identificador do cliente em clientes/clientes.json")
     ap.add_argument(
         "--modo",
         choices=["dry-run", "apply", "offline"],
@@ -151,26 +165,28 @@ def main() -> None:
     )
     ap.add_argument(
         "--confirmar",
-        action="store_true",
-        help="Obrigatorio no --modo apply: confirma a execucao de escritas no Omie.",
+        metavar="CLIENTE",
+        help="Obrigatório no --modo apply: digite o código de confirmação do cliente.",
     )
     args = ap.parse_args()
 
     # Salvaguarda: apply e um modo de ESCRITA em ambiente real. Exige confirmacao
     # explicita para nao executar por acidente.
-    if args.modo == "apply" and not args.confirmar:
+    perfil = carregar_perfil(args.cliente)
+    if args.modo == "apply" and args.confirmar != perfil.confirmacao_apply:
         raise SystemExit(
-            "MODO APPLY exige confirmacao explicita. Este modo EXECUTA inclusoes "
-            "e baixas no Omie (escrita real). Reexecute com --confirmar se tem "
-            "certeza."
+            f"MODO APPLY exige --confirmar {perfil.confirmacao_apply}. Este modo "
+            "EXECUTA inclusões e baixas reais no Omie."
         )
 
-    registros, resumo = processar(args.ofx, args.config, modo=args.modo)
+    registros, resumo = processar(
+        args.ofx, perfil.config_path, perfil.plano_contas_path, modo=args.modo, perfil=perfil
+    )
 
-    os.makedirs(args.saida, exist_ok=True)
+    os.makedirs(perfil.saida_path, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_path = os.path.join(args.saida, f"conciliacao_{ts}.csv")
-    json_path = os.path.join(args.saida, f"conciliacao_{ts}.json")
+    csv_path = os.path.join(perfil.saida_path, f"conciliacao_{ts}.csv")
+    json_path = os.path.join(perfil.saida_path, f"conciliacao_{ts}.json")
 
     escrever_csv(csv_path, registros)
     escrever_json(json_path, registros, resumo)
