@@ -7,6 +7,10 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+<!-- Adicione aqui as mudanças que ainda não entraram em uma release. -->
+
+## [0.2.0] - 2026-09-29
+
 ### Alterado
 - Roteamento e plano de contas agora são **isolados por cliente**
   (`clientes/<id>/roteamento.json` e `clientes/<id>/contas-haru.json`), em vez
@@ -47,5 +51,6 @@ Primeira versão marcada do conciliador OFX → Omie.
 - Guia de execução do conciliador (`conciliador-ofx/COMO-EXECUTAR.md`).
 - Proposta e análise de endpoints/roteamento (`proposta-conciliacao-ofx/`).
 
-[Não lançado]: https://github.com/saulobcs/integracao-omie/compare/v0.1.0...HEAD
+[Não lançado]: https://github.com/saulobcs/integracao-omie/compare/v0.2.0...HEAD
 [0.1.0]: https://github.com/saulobcs/integracao-omie/releases/tag/v0.1.0
+[0.2.0]: https://github.com/saulobcs/integracao-omie/releases/tag/v0.2.0
