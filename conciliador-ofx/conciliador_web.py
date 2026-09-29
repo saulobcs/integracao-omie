@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 
+from conciliador import __version__
 from conciliador.perfis import PerfilInvalido, carregar_perfil, listar_perfis
 from main import escrever_csv, escrever_html, escrever_json, processar
 
@@ -97,7 +98,7 @@ def _pagina_inicial(mensagem: str = "") -> bytes:
 class Aplicacao(BaseHTTPRequestHandler):
     """Servidor HTTP local para uma única tela de processamento."""
 
-    server_version = "ConciliadorOFX/1.0"
+    server_version = f"ConciliadorOFX/{__version__}"
 
     def log_message(self, _format: str, *_args: object) -> None:
         """Evita logs de acesso no terminal do usuário."""

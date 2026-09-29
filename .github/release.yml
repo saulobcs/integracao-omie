@@ -1,0 +1,42 @@
+# Configuração das notas de release geradas automaticamente pelo GitHub.
+# Docs: https://docs.github.com/pt/repositories/releasing-projects-on-github/automatically-generated-release-notes
+#
+# As notas são agrupadas por rótulo (label) dos PRs. Aplique os labels abaixo
+# aos seus PRs para que caiam na categoria certa. PRs sem label conhecida
+# caem em "Outras mudanças".
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - duplicate
+    authors:
+      - dependabot
+      - github-actions
+  categories:
+    - title: 🚀 Funcionalidades
+      labels:
+        - feature
+        - feat
+        - enhancement
+    - title: 🐛 Correções
+      labels:
+        - fix
+        - bug
+        - bugfix
+    - title: 🔒 Segurança
+      labels:
+        - security
+    - title: 📝 Documentação
+      labels:
+        - docs
+        - documentation
+    - title: 🧹 Manutenção e refatoração
+      labels:
+        - chore
+        - refactor
+        - build
+        - ci
+    - title: 🔧 Outras mudanças
+      labels:
+        - "*"
