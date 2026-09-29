@@ -26,7 +26,7 @@ from conciliador.parser_ofx import parse_ofx
 from conciliador.regras import MotorDeRegras
 
 _OFX = os.path.join(_RAIZ, "..", "arquivos-referencia", "Comprovante de Extrato (8).ofx")
-_CONFIG = os.path.join(_RAIZ, "config", "roteamento.json")
+_CONFIG = os.path.join(_RAIZ, "clientes", "haru", "roteamento.json")
 
 
 class _FakeBase:

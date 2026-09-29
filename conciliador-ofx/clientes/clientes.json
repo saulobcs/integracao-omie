@@ -3,8 +3,8 @@
     {
       "id": "haru",
       "nome": "Haru",
-      "config": "config/roteamento.json",
-      "plano_contas": "../arquivos-referencia/contas-haru.json",
+      "config": "clientes/haru/roteamento.json",
+      "plano_contas": "clientes/haru/contas-haru.json",
       "env": "clientes/haru/.env",
       "saida": "saida/haru",
       "confirmacao_apply": "HARU",

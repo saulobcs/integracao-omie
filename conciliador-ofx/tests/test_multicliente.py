@@ -87,8 +87,8 @@ class TestRegistroDeClientes(unittest.TestCase):
                     {
                         "id": "x",
                         "nome": "X",
-                        "config": "config/roteamento.json",
-                        "plano_contas": "../arquivos-referencia/contas-haru.json",
+                        "config": "clientes/x/roteamento.json",
+                        "plano_contas": "clientes/x/contas.json",
                         "env": "../../../../etc/passwd",
                         "saida": "saida/x",
                     }
@@ -111,11 +111,44 @@ class TestRegistroDeClientes(unittest.TestCase):
                     {
                         "id": "../evil",
                         "nome": "X",
-                        "config": "config/roteamento.json",
-                        "plano_contas": "../arquivos-referencia/contas-haru.json",
+                        "config": "clientes/x/roteamento.json",
+                        "plano_contas": "clientes/x/contas.json",
                         "env": "clientes/x/.env",
                         "saida": "saida/x",
                     }
+                ]
+            }
+        )
+        original = perfis._REGISTRO
+        perfis._REGISTRO = reg
+        try:
+            with self.assertRaises(PerfilInvalido):
+                listar_perfis()
+        finally:
+            perfis._REGISTRO = original
+
+    def test_roteamento_compartilhado_bloqueado(self):
+        # Dois clientes NAO podem apontar para o mesmo arquivo de roteamento:
+        # ele contem IDs de conta (nCodCC) especificos do Omie de cada cliente.
+        reg = self._com_registro(
+            {
+                "clientes": [
+                    {
+                        "id": "a",
+                        "nome": "A",
+                        "config": "clientes/compartilhado/roteamento.json",
+                        "plano_contas": "clientes/a/contas.json",
+                        "env": "clientes/a/.env",
+                        "saida": "saida/a",
+                    },
+                    {
+                        "id": "b",
+                        "nome": "B",
+                        "config": "clientes/compartilhado/roteamento.json",
+                        "plano_contas": "clientes/b/contas.json",
+                        "env": "clientes/b/.env",
+                        "saida": "saida/b",
+                    },
                 ]
             }
         )
