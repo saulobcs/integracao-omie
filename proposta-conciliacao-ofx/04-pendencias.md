@@ -1,21 +1,39 @@
 # Pendências e Confirmações
 
-Itens em aberto que precisam ser confirmados antes de finalizar a implementação.
+Itens que precisam ser confirmados antes de finalizar a implementação.
+
+## Quadro-resumo
+
+| # | Tema | Status |
+|---|------|--------|
+| P1 | `nCodCC` das contas + categoria | **Parcial** — contas mapeadas; falta `cCodCateg` |
+| P2 | Estabilidade do FITID entre reexportações | **Aberto** — validar em teste operacional |
+| P3 | Idempotência das operações | **Parcial** — crédito resolvido; baixa a confirmar |
+| P3.1 | Derivação FITID → `cCodIntLanc` | **Resolvido** |
+| P4 | Débito Pix (mão de obra) | **Parcial** — roteia p/ baixa; falta fallback sem título |
+| P5 | Documento de origem (antecipação) | **Aberto** — validação contábil |
+| P6 | Estornos de pagamento (crédito) | **Aberto** — sem regra; cai no manual |
 
 ---
 
 ## P1 — Mapeamento da conta corrente Omie (`nCodCC`)
 
-**Status:** aberto — a confirmar.
+**Status:** PARCIALMENTE RESOLVIDO — contas mapeadas; falta a categoria (`cCodCateg`).
 
-Qual conta corrente no Omie (`nCodCC`) corresponde à conta Stone do extrato
-(`ACCTID` 6684788-0, banco 0197)? E quais são os `nCodCC` das contas destino de
-crédito ("Conta de crédito", "Conta Pix", "Conta iFood")?
+Os `nCodCC` de origem e destino já estão preenchidos em
+[`config/roteamento.json`](../conciliador-ofx/config/roteamento.json):
 
-- **Impacto:** sem isso, o mapa de configuração em
-  [`03-regras-de-roteamento.md`](./03-regras-de-roteamento.md) fica com
-  `ncodcc_destino: null`. Necessário para executar `IncluirLancCC`.
-- **Como obter:** `ListarContasCorrentes` (`/api/v1/geral/contacorrente/`).
+- **Stone** (origem `9250313570`) → destinos: Stone - Cartão de Crédito
+  (`9064882272`), Stone - Débito (`9064886018`), Stone - PIX (`9064890501`),
+  iFood (`9078464090`).
+- **Sicredi** (origem `9062604986`) → destinos: Sodexo (`9127278683`), Alelo
+  (`9127278424`), iFood (`9078464090`), Integralização de Capital (`9081411426`).
+
+**Resíduo (ainda pendente):** todas as regras estão com **`ccodcateg: null`**. A
+categoria do lançamento (`detalhes.cCodCateg` do `IncluirLancCC`) ainda não foi
+definida por conta destino.
+
+- **Como obter as categorias:** `ListarCategorias` (`/api/v1/geral/categorias/`).
 
 ---
 
@@ -37,14 +55,19 @@ regenera a cada exportação?
 
 ## P3 — Parâmetros de idempotência/identificação nas baixas (API Omie)
 
-**Status:** aberto — confirmar na página logada do serviço.
+**Status:** PARCIALMENTE RESOLVIDO — idempotência do crédito garantida; baixa a confirmar.
 
-- `LancarPagamento` (baixa de contas a pagar) e `LancarRecebimento` aceitam um
-  **código de integração da baixa** (para correlacionar com o `FITID`)?
-- Identificação exata do título na baixa: `codigo_lancamento` (nCodTitulo) vs.
-  código de integração.
-- `IncluirLancCC`: comportamento ao reenviar um `cCodIntLanc` já usado (erro de
-  duplicidade vs. upsert)? Define a força da idempotência server-side.
+- **`IncluirLancCC` (crédito) — RESOLVIDO:** antes de incluir, o conciliador
+  consulta `ConsultaLancCC` pelo `cCodIntLanc` derivado do FITID; se já existir,
+  **não** reinclui e registra "já existe" (ver `acoes.py`). A idempotência não
+  depende mais só do comportamento server-side de `cCodIntLanc` duplicado —
+  passou a ser garantida pelo próprio fluxo (consulta-antes-de-incluir).
+- **`LancarPagamento` (baixa) — pendente:** confirmar se a baixa aceita um
+  **código de integração próprio** (para correlacionar com o FITID). Hoje a
+  baixa usa `codigo_lancamento` (nCodTitulo) + `observacao` com o FITID; falta um
+  identificador de idempotência da baixa em si.
+- **Identificação do título na baixa:** `codigo_lancamento` (nCodTitulo) é o
+  usado atualmente.
 
 ### P3.1 — Derivação FITID → `cCodIntLanc` (limite de 20 caracteres)
 
@@ -68,30 +91,22 @@ preciso mais entropia em 20 chars, migrar para base62.
 
 ## P4 — Tratamento de transferências Pix de débito (freelancer / motoboy)
 
-**Status:** aberto — definir tratativa para evitar cair no manual.
+**Status:** DECISÃO PARCIAL — roteado para baixa de conta a pagar; falta o fallback.
 
-**Contexto do negócio:** os débitos `... - Transferência | Pix` são, em geral,
-**pagamentos a freelancer e motoboy** (mão de obra), e não a fornecedores com
-título em contas a pagar.
+**Decisão adotada (opção 3):** o débito `... - Transferência | Pix` é roteado para
+**`baixar_conta_pagar`** (ver `config/roteamento.json`, regra "Pagamento via PIX
+(Transferência)"). O conciliador pesquisa um título a pagar em aberto (venc. hoje
+±5 dias) e casa por **valor exato + `nome_fantasia` contido no MEMO**.
 
-**Desafio de classificação:** o `MEMO` traz apenas o **nome da pessoa** (ex.:
-"MICHELI FERNANDA RIBEIRO DA SILVA - Transferência | Pix"), variável e sem sufixo
-padronizado que os diferencie de outras transferências Pix de débito. Casar por
-sufixo (` - Transferência | Pix`) não separa "pagamento a motoboy" de outros usos
-do mesmo tipo de transação.
+**Resíduo (ainda pendente):** quando **não** há título correspondente (caso comum
+de mão de obra sem provisionamento), a transação cai em **manual**. Falta decidir
+o fallback — por exemplo, rotear para uma **conta/categoria de pagamento de mão de
+obra** via `IncluirLancCC` (opção 1 original). Isso depende de existir essa
+categoria/conta no Omie.
 
-**Opções a decidir:**
-1. Rotear todo débito `- Transferência | Pix` para uma **conta/categoria de
-   pagamento de mão de obra** via `IncluirLancCC` (simples, mas agrupa tudo).
-2. Manter uma **lista de nomes conhecidos** (freelancers/motoboys) no mapa de
-   configuração para classificar por nome + tipo.
-3. Buscar em **contas a pagar** primeiro (caso esses pagamentos sejam
-   provisionados como título) e, se não achar, aplicar a regra 1.
-4. Deixar no **manual** (comportamento padrão atual) — a ser evitado conforme
-   solicitado.
-
-**A definir:** qual das opções (ou combinação) adotar, e se há categoria/conta
-específica no Omie para pagamento de mão de obra.
+**Nota:** o mesmo sufixo ` - Transferência | Pix` também aparece em **crédito**
+(iFood); o motor separa pelo sinal da transação, então não há conflito entre a
+regra de crédito iFood e a de débito.
 
 ---
 
