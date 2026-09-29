@@ -26,35 +26,56 @@ relatório (CSV + JSON). Ele tem **dois modos** (ver seção 4):
 
 ---
 
-## 2. Criar o ambiente virtual
+## 2. Instalação automática
 
-Crie o ambiente uma vez por máquina, dentro de `conciliador-ofx/`. A pasta
-`.venv/` é local e já é ignorada pelo Git. Embora o projeto hoje use somente a
-biblioteca padrão, o ambiente virtual padroniza a execução e isola futuras
-dependências.
+Rode o instalador do seu sistema, uma vez por máquina. Ele faz **tudo**
+automaticamente: localiza o Python 3.9+ (e **instala** se não houver), cria o
+ambiente virtual `.venv/`, atualiza o pip, instala as dependências
+(`requirements.txt`) e prepara os arquivos `.env` (da raiz e de cada cliente) a
+partir dos `.env.example` — **sem sobrescrever** os que já existirem. Ao final,
+roda os testes como verificação.
 
-### macOS
+Os instaladores ficam em `conciliador-ofx/instaladores/`, um pacote por sistema:
+
+| Sistema | Instalador | Auto-instala o Python via |
+|---------|-----------|---------------------------|
+| macOS | `instaladores/macos/install.command` | Homebrew (instala o Homebrew se faltar) |
+| Linux | `instaladores/linux/install.sh` | apt / dnf / yum / pacman / zypper |
+| Windows | `instaladores/windows/install.bat` | winget |
 
 ```bash
-cd conciliador-ofx
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
+# macOS (ou clique duas vezes em install.command no Finder)
+conciliador-ofx/instaladores/macos/install.command
+
+# Linux
+conciliador-ofx/instaladores/linux/install.sh
 ```
 
-### Windows (PowerShell)
-
-```powershell
-cd conciliador-ofx
-py -3 -m venv .venv
-.venv\Scripts\python.exe -m pip install --upgrade pip
-.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+# Windows: clique duas vezes em
+conciliador-ofx\instaladores\windows\install.bat
 ```
 
-Não é necessário ativar o ambiente virtual: os comandos deste guia usam
-diretamente o interpretador dentro de `.venv`. Se preferir ativá-lo, use
-`source .venv/bin/activate` no macOS ou `.\.venv\Scripts\Activate.ps1` no
-PowerShell.
+> **Auto-instalação do Python:** se o Python não for encontrado, o instalador o
+> instala pelo gerenciador do sistema (pode pedir senha de administrador). No
+> Windows, após instalar via winget, pode ser necessário reabrir o terminal e
+> rodar o instalador de novo (o PATH só atualiza em uma nova sessão).
+
+Fica pendente **apenas** o preenchimento manual das credenciais nos `.env`
+(seção 2.1). Reexecutar o instalador é seguro: ele reutiliza o `.venv` e nunca
+sobrescreve `.env` existentes.
+
+> A pasta `.venv/` e os `.env` são locais e já ignorados pelo Git. Os comandos
+> deste guia usam diretamente o interpretador dentro de `.venv`, sem precisar
+> ativá-lo.
+
+### 2.1 Preencher as credenciais (manual)
+
+O instalador cria os `.env` vazios. Edite cada um com as chaves do Omie:
+
+- **Raiz** (`.env`): uso single/CLI sem `--cliente`.
+- **Por cliente** (`clientes/<id>/.env`): uso multicliente. O instalador lista,
+  ao final, quais foram criados.
 
 ### Interface gráfica e lançadores
 
