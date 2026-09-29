@@ -17,7 +17,7 @@ relatório (CSV + JSON). Ele tem **dois modos** (ver seção 4):
 |-----------|---------|
 | **Python 3.9+** | O projeto usa apenas a biblioteca padrão (stdlib). **Não** há dependências externas (`requests`, `python-dotenv`, etc.) para instalar. |
 | **Arquivo OFX** | O extrato bancário a conciliar (ex.: extrato da Stone). |
-| **`config/roteamento.json`** | Mapa de regras por conta de origem (já versionado). |
+| **`clientes/<id>/roteamento.json`** | Mapa de regras por conta de origem, específico de cada cliente (já versionado). Ex.: `clientes/haru/roteamento.json`. |
 | **Credenciais Omie** (opcional) | `app_key`/`app_secret` no `.env`. Só necessárias para a etapa de **consulta** à API (matching de débito e checagem de idempotência do crédito). Sem elas, o fluxo roda em modo offline. |
 
 > A API Omie **não** tem endpoint de autenticação separado: as credenciais vão
@@ -164,8 +164,8 @@ A partir da pasta `conciliador-ofx/`:
 # macOS: apontando para um extrato específico
 .venv/bin/python main.py \
   --ofx "../arquivos-referencia/Stone.ofx" \
-  --config config/roteamento.json \
-  --saida saida
+  --cliente haru \
+  --modo offline
 ```
 
 No Windows PowerShell, substitua `.venv/bin/python` por
@@ -176,7 +176,7 @@ No Windows PowerShell, substitua `.venv/bin/python` por
 | Argumento | Padrão | Descrição |
 |-----------|--------|-----------|
 | `--ofx` | `../arquivos-referencia/Comprovante de Extrato.ofx` | Caminho do arquivo OFX a processar. |
-| `--config` | `config/roteamento.json` | Mapa de roteamento (origens e regras). |
+| `--cliente` | (obrigatório) | Identificador do cliente em `clientes/clientes.json`. Determina o roteamento (`clientes/<id>/roteamento.json`), o plano de contas, o `.env` e a pasta de saída. |
 | `--saida` | `saida/` | Pasta onde os relatórios são gravados. |
 | `--modo` | `dry-run` | Modo de execução: `dry-run`, `apply` ou `offline` (ver abaixo). |
 | `--confirmar` | (desligado) | **Obrigatório** no `--modo apply`. Confirma que você quer executar escritas reais no Omie. |
@@ -247,10 +247,11 @@ Os testes cobrem:
 
 ## 8. O que preparar antes de conciliar um extrato novo
 
-1. **Preencher/ajustar `config/roteamento.json`** para a conta de origem:
-   identificação (`BANKID`/`ACCTID`), `nCodCC` de origem e destinos, e as regras
-   de crédito/débito por MEMO. Os `nCodCC` das contas vêm do
-   `arquivos-referencia/contas-haru.json` (ou de `ListarContasCorrentes`).
+1. **Preencher/ajustar `clientes/<id>/roteamento.json`** do cliente para a conta
+   de origem: identificação (`BANKID`/`ACCTID`), `nCodCC` de origem e destinos, e
+   as regras de crédito/débito por MEMO. Os `nCodCC` das contas vêm do plano de
+   contas do cliente (`clientes/<id>/contas-haru.json`) ou de
+   `ListarContasCorrentes`.
 2. **Preencher o `.env`** se quiser rodar com consulta à API.
 3. **Rodar** com `--ofx` apontando para o extrato.
 4. **Revisar** o relatório: transações em rota `manual` exigem tratamento

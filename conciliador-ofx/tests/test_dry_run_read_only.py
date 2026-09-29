@@ -54,7 +54,7 @@ METODOS_ESCRITA = [
 ]
 
 _OFX_STONE = os.path.join(_RAIZ, "..", "arquivos-referencia", "Stone.ofx")
-_CONFIG = os.path.join(_RAIZ, "config", "roteamento.json")
+_CONFIG = os.path.join(_RAIZ, "clientes", "haru", "roteamento.json")
 
 
 class RedeProibida(AssertionError):

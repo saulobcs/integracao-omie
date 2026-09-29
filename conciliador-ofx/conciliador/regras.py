@@ -2,7 +2,7 @@
 
 Decide, para cada transacao do extrato, qual acao seria executada no Omie,
 com base no sinal (credito/debito) e no texto do MEMO, conforme o mapa de
-configuracao (config/roteamento.json).
+configuracao do cliente (clientes/<id>/roteamento.json).
 
 O mapa suporta MULTIPLAS contas de origem: a origem e identificada pelo
 BANKID/ACCTID do extrato OFX e cada origem tem suas proprias regras de

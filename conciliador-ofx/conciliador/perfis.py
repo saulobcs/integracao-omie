@@ -57,6 +57,28 @@ def _caminho_relativo(valor: str) -> str:
     return caminho
 
 
+def _validar_isolamento(perfis: List[PerfilCliente]) -> None:
+    """Impede que dois clientes compartilhem roteamento ou plano de contas.
+
+    Roteamento e plano de contas carregam IDs do Omie (nCodCC/cCodCateg) que
+    só têm significado dentro do Omie de UM cliente. Compartilhar esses
+    arquivos entre clientes rotearia lançamentos para contas erradas -- por
+    isso o compartilhamento é bloqueado explicitamente.
+    """
+    for campo, rotulo in (("config_path", "roteamento"), ("plano_contas_path", "plano de contas")):
+        vistos: Dict[str, str] = {}
+        for perfil in perfis:
+            caminho = getattr(perfil, campo)
+            if caminho in vistos:
+                raise PerfilInvalido(
+                    f"Configuração inválida: os clientes {vistos[caminho]!r} e "
+                    f"{perfil.id!r} compartilham o mesmo arquivo de {rotulo} "
+                    f"({caminho}). Cada cliente deve ter o seu, pois ele contém "
+                    "IDs de conta (nCodCC/cCodCateg) específicos do Omie do cliente."
+                )
+            vistos[caminho] = perfil.id
+
+
 def listar_perfis() -> List[PerfilCliente]:
     if not os.path.isfile(_REGISTRO):
         raise PerfilInvalido(f"Registro de clientes não encontrado: {_REGISTRO}")
@@ -79,6 +101,7 @@ def listar_perfis() -> List[PerfilCliente]:
                 contas_ofx_permitidas=list(item.get("contas_ofx_permitidas") or []),
             )
         )
+    _validar_isolamento(perfis)
     return perfis
 
 

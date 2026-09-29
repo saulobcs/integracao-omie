@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Conciliador OFX x Omie -- experimento em modo DRY-RUN.
 
-Le um extrato OFX, aplica as regras de roteamento (config/roteamento.json) e
-gera um relatorio (CSV + JSON) com as acoes que SERIAM executadas no Omie.
-Nao chama a API -- nao requer app_key/app_secret.
+Le um extrato OFX, aplica as regras de roteamento (roteamento do cliente, em
+clientes/<id>/roteamento.json) e gera um relatorio (CSV + JSON) com as acoes
+que SERIAM executadas no Omie. Nao chama a API -- nao requer app_key/app_secret.
 
 Uso:
     python3 main.py \
         --ofx "../arquivos-referencia/Comprovante de Extrato.ofx" \
-        --config config/roteamento.json \
+        --cliente haru \
         --saida saida
 
 Sem argumentos, usa os caminhos padrao acima.
@@ -39,9 +39,9 @@ from conciliador.relatorio import (
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 _OFX_PADRAO = os.path.join(_AQUI, "..", "arquivos-referencia", "Comprovante de Extrato.ofx")
-_CONFIG_PADRAO = os.path.join(_AQUI, "config", "roteamento.json")
+_CONFIG_PADRAO = os.path.join(_AQUI, "clientes", "haru", "roteamento.json")
 _SAIDA_PADRAO = os.path.join(_AQUI, "saida")
-_PLANO_CONTAS_PADRAO = os.path.join(_AQUI, "..", "arquivos-referencia", "contas-haru.json")
+_PLANO_CONTAS_PADRAO = os.path.join(_AQUI, "clientes", "haru", "contas-haru.json")
 
 
 def carregar_plano_contas(caminho: str) -> Dict[int, str]:

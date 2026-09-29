@@ -7,8 +7,17 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
-<!-- Adicione aqui as mudanças que ainda não entraram em uma release.
-     Ao lançar, mova este bloco para uma nova seção versionada abaixo. -->
+### Alterado
+- Roteamento e plano de contas agora são **isolados por cliente**
+  (`clientes/<id>/roteamento.json` e `clientes/<id>/contas-haru.json`), em vez
+  de um `config/roteamento.json` global. Esses arquivos carregam IDs do Omie
+  (`nCodCC`/`cCodCateg`) específicos de cada cliente.
+- `clientes.json` do perfil `haru` atualizado para os novos caminhos.
+
+### Adicionado
+- Validação que impede dois clientes de compartilharem o mesmo arquivo de
+  roteamento ou de plano de contas (evita rotear lançamentos para contas de
+  outro cliente).
 
 ## [0.1.0] - 2026-09-29
 
