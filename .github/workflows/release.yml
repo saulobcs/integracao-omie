@@ -1,0 +1,53 @@
+name: Release
+
+# Dispara quando uma tag no formato vX.Y.Z é enviada ao repositório.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"  # pré-lançamentos (ex.: v1.2.0-rc.1)
+
+# Permite que o job crie o Release usando o token padrão do Actions.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publicar GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # histórico completo para as notas automáticas
+
+      - name: Validar que a tag bate com conciliador.__version__
+        run: |
+          tag="${GITHUB_REF_NAME#v}"          # remove o "v" -> X.Y.Z
+          tag_base="${tag%%-*}"               # remove sufixo de pré-lançamento
+          ver=$(grep -oE '__version__ *= *"[^"]+"' \
+            conciliador-ofx/conciliador/__init__.py | grep -oE '[0-9][^"]*')
+          echo "Tag: $tag_base | __version__: $ver"
+          if [ "$tag_base" != "$ver" ]; then
+            echo "::error::A tag ($tag_base) não corresponde a __version__ ($ver)."
+            exit 1
+          fi
+
+      - name: Detectar pré-lançamento
+        id: prerelease
+        run: |
+          if echo "${GITHUB_REF_NAME}" | grep -q '-'; then
+            echo "value=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Criar Release com notas automáticas
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag \
+            $([ "${{ steps.prerelease.outputs.value }}" = "true" ] && echo "--prerelease")

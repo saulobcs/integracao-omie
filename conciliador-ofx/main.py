@@ -22,6 +22,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List
 
+from conciliador import __version__
 from conciliador.acoes import ExecutorApply, ExecutorDryRun
 from conciliador.config_env import carregar_credenciais
 from conciliador.omie_client import OmieClient
@@ -152,6 +153,11 @@ def processar(
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Conciliador OFX x Omie (dry-run)")
+    ap.add_argument(
+        "--version",
+        action="version",
+        version=f"Conciliador OFX x Omie {__version__}",
+    )
     ap.add_argument("--ofx", default=_OFX_PADRAO, help="Caminho do arquivo OFX")
     ap.add_argument("--cliente", required=True, help="Identificador do cliente em clientes/clientes.json")
     ap.add_argument(

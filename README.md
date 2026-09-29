@@ -33,6 +33,14 @@ gera um relatório das ações que seriam executadas no Omie. Ele roda em
 A análise dos endpoints e as coleções para importar no Apidog ficam em
 [`proposta-conciliacao-ofx/`](./proposta-conciliacao-ofx/).
 
+## Releases e versionamento
+
+O projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) e
+publica GitHub Releases automaticamente a partir de tags `vX.Y.Z`. O histórico
+de mudanças fica em [`CHANGELOG.md`](./CHANGELOG.md) e o processo completo (como
+lançar, script `release.sh`, labels de PR) está em
+[`docs/RELEASES.md`](./docs/RELEASES.md).
+
 ## Resumo rápido
 
 - **Tipo de API:** REST sobre HTTP, com payload JSON (também há suporte a SOAP/WSDL).
