@@ -9,9 +9,11 @@ Uso:
     python3 main.py \
         --ofx "../arquivos-referencia/Comprovante de Extrato.ofx" \
         --cliente haru \
-        --saida saida
+        --modo offline
 
-Sem argumentos, usa os caminhos padrao acima.
+--cliente e obrigatorio: determina o roteamento, o plano de contas, o .env e a
+pasta de saida do cliente (ver clientes/clientes.json). O --ofx tem um valor
+padrao (extrato de referencia); os demais caminhos vem do perfil do cliente.
 """
 
 from __future__ import annotations

@@ -20,8 +20,8 @@ Itens que precisam ser confirmados antes de finalizar a implementação.
 
 **Status:** PARCIALMENTE RESOLVIDO — contas mapeadas; falta a categoria (`cCodCateg`).
 
-Os `nCodCC` de origem e destino já estão preenchidos em
-[`config/roteamento.json`](../conciliador-ofx/config/roteamento.json):
+Os `nCodCC` de origem e destino já estão preenchidos no roteamento do cliente
+[`clientes/haru/roteamento.json`](../conciliador-ofx/clientes/haru/roteamento.json):
 
 - **Stone** (origem `9250313570`) → destinos: Stone - Cartão de Crédito
   (`9064882272`), Stone - Débito (`9064886018`), Stone - PIX (`9064890501`),
@@ -94,7 +94,7 @@ preciso mais entropia em 20 chars, migrar para base62.
 **Status:** DECISÃO PARCIAL — roteado para baixa de conta a pagar; falta o fallback.
 
 **Decisão adotada (opção 3):** o débito `... - Transferência | Pix` é roteado para
-**`baixar_conta_pagar`** (ver `config/roteamento.json`, regra "Pagamento via PIX
+**`baixar_conta_pagar`** (ver `clientes/haru/roteamento.json`, regra "Pagamento via PIX
 (Transferência)"). O conciliador pesquisa um título a pagar em aberto (venc. hoje
 ±5 dias) e casa por **valor exato + `nome_fantasia` contido no MEMO**.
 

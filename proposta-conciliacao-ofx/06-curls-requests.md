@@ -96,7 +96,8 @@ curl -sS -X POST "${OMIE_BASE}/geral/contacorrente/" \
 ```
 
 > Da resposta, capture `nCodCC` de cada conta (Stone origem + contas destino de
-> crédito/Pix/iFood) e preencha em `config/roteamento.json`.
+> crédito/Pix/iFood) e preencha no roteamento do cliente
+> (`clientes/<id>/roteamento.json`).
 
 ---
 
@@ -131,7 +132,7 @@ curl -sS -X POST "${OMIE_BASE}/geral/categorias/" \
 ```
 
 > Da resposta, use o campo `codigo` (string 20) de cada categoria como valor de
-> `cCodCateg`. Preencha os `ccodcateg: null` de `config/roteamento.json`.
+> `cCodCateg`. Preencha os `ccodcateg: null` de `clientes/<id>/roteamento.json`.
 
 ---
 
