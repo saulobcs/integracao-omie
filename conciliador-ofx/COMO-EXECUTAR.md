@@ -73,9 +73,12 @@ sobrescreve `.env` existentes.
 
 O instalador cria os `.env` vazios. Edite cada um com as chaves do Omie:
 
-- **Raiz** (`.env`): uso single/CLI sem `--cliente`.
-- **Por cliente** (`clientes/<id>/.env`): uso multicliente. O instalador lista,
-  ao final, quais foram criados.
+- **Por cliente** (`clientes/<id>/.env`): é o que a CLI usa. Como `--cliente` é
+  obrigatório, o fluxo normal sempre lê as credenciais do `.env` do cliente
+  selecionado. O instalador lista, ao final, quais foram criados.
+- **Raiz** (`.env`): fallback para uso programático/override pontual (ex.:
+  `OMIE_APP_KEY=... python3 main.py`). Não é usado quando um cliente é
+  selecionado.
 
 ### Interface gráfica e lançadores
 
@@ -158,13 +161,13 @@ por testes automatizados (ver seção 6).
 A partir da pasta `conciliador-ofx/`:
 
 ```bash
-# macOS: com os caminhos padrão (extrato de referência)
-.venv/bin/python main.py
+# macOS: cliente + extrato de referência (o --cliente é obrigatório)
+.venv/bin/python main.py --cliente haru
 
 # macOS: apontando para um extrato específico
 .venv/bin/python main.py \
-  --ofx "../arquivos-referencia/Stone.ofx" \
   --cliente haru \
+  --ofx "../arquivos-referencia/Stone.ofx" \
   --modo offline
 ```
 
@@ -175,11 +178,14 @@ No Windows PowerShell, substitua `.venv/bin/python` por
 
 | Argumento | Padrão | Descrição |
 |-----------|--------|-----------|
+| `--cliente` | (obrigatório) | Identificador do cliente em `clientes/clientes.json`. Determina o roteamento (`clientes/<id>/roteamento.json`), o plano de contas, o `.env` e a pasta de saída (`saida/<id>/`). |
 | `--ofx` | `../arquivos-referencia/Comprovante de Extrato.ofx` | Caminho do arquivo OFX a processar. |
-| `--cliente` | (obrigatório) | Identificador do cliente em `clientes/clientes.json`. Determina o roteamento (`clientes/<id>/roteamento.json`), o plano de contas, o `.env` e a pasta de saída. |
-| `--saida` | `saida/` | Pasta onde os relatórios são gravados. |
 | `--modo` | `dry-run` | Modo de execução: `dry-run`, `apply` ou `offline` (ver abaixo). |
 | `--confirmar` | (desligado) | **Obrigatório** no `--modo apply`. Confirma que você quer executar escritas reais no Omie. |
+| `--version` | — | Mostra a versão do conciliador e sai. |
+
+> A pasta de saída não é um argumento: vem do perfil do cliente
+> (`saida/<id>/`). Os relatórios (CSV/JSON/HTML) são gravados lá.
 
 ### Modos de execução
 
@@ -191,13 +197,13 @@ No Windows PowerShell, substitua `.venv/bin/python` por
 
 ```bash
 # dry-run (padrão): consulta, não escreve
-.venv/bin/python main.py --ofx "../arquivos-referencia/Stone.ofx"
+.venv/bin/python main.py --cliente haru --ofx "../arquivos-referencia/Stone.ofx"
 
 # offline: sem nenhuma chamada à API
-.venv/bin/python main.py --ofx "../arquivos-referencia/Stone.ofx" --modo offline
+.venv/bin/python main.py --cliente haru --ofx "../arquivos-referencia/Stone.ofx" --modo offline
 
-# apply: EXECUÇÃO REAL (exige --confirmar)
-.venv/bin/python main.py --ofx "../arquivos-referencia/Stone.ofx" --modo apply --confirmar
+# apply: EXECUÇÃO REAL (exige --confirmar com o código do cliente)
+.venv/bin/python main.py --cliente haru --ofx "../arquivos-referencia/Stone.ofx" --modo apply --confirmar HARU
 ```
 
 > **`apply` é escrita real.** Sem `--confirmar`, o programa aborta com aviso. O
