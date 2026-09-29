@@ -30,6 +30,7 @@ from conciliador.perfis import PerfilCliente, carregar_perfil
 from conciliador.regras import MotorDeRegras
 from conciliador.relatorio import (
     escrever_csv,
+    escrever_html,
     escrever_json,
     gerar_resumo,
     imprimir_resumo,
@@ -187,14 +188,17 @@ def main() -> None:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_path = os.path.join(perfil.saida_path, f"conciliacao_{ts}.csv")
     json_path = os.path.join(perfil.saida_path, f"conciliacao_{ts}.json")
+    html_path = os.path.join(perfil.saida_path, f"conciliacao_{ts}.html")
 
     escrever_csv(csv_path, registros)
     escrever_json(json_path, registros, resumo)
+    escrever_html(html_path, registros, resumo)
 
     imprimir_resumo(resumo)
     print(f"Modo: {resumo.get('modo')}")
     print(f"CSV : {csv_path}")
     print(f"JSON: {json_path}")
+    print(f"HTML: {html_path}")
 
 
 if __name__ == "__main__":
